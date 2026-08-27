@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Sitecore AI demo">
+  <defs>
+    <linearGradient id="g" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF1F38"/>
+      <stop offset="0.55" stop-color="#8629FF"/>
+      <stop offset="1" stop-color="#4300AD"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#g)"/>
+  <!-- Sitecore-style AI node cluster -->
+  <circle cx="11" cy="12" r="2.4" fill="#fff"/>
+  <circle cx="21" cy="12" r="2.4" fill="#fff"/>
+  <circle cx="16" cy="20" r="2.6" fill="#fff"/>
+  <path d="M13 13.2 L14.6 18.2 M19 13.2 L17.4 18.2 M13.4 12 H18.6" stroke="#fff" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+  <!-- spark -->
+  <path d="M25.2 6.2 L25.9 8.1 L27.8 8.8 L25.9 9.5 L25.2 11.4 L24.5 9.5 L22.6 8.8 L24.5 8.1 Z" fill="#27C2FF"/>
+</svg>

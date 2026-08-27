@@ -1,0 +1,41 @@
+---
+description: TFM Scrunch booth microsite — architecture, conventions, and key paths
+alwaysApply: true
+---
+
+# TFM Scrunch
+
+Public two-page Next.js App Router microsite for the Sitecore + Scrunch stand at Technology for
+Marketing 2026. No visitor login — the kiosk stays public. Audits are generated live by Gemini;
+booth leads are written server-side to Firestore.
+
+## Stack
+
+- **Framework**: Next.js (App Router), React 19, Tailwind 4, `next/font/google` (Google Sans)
+- **AI**: Gemini via `ai` + `@ai-sdk/google`, called only from `src/server/audit/` (server-only)
+- **Persistence**: Firestore collections `tmf_scrunch_leads` and `tmf_scrunch_reports` (Firebase
+  Admin, server-only) plus a local `data/leads.jsonl` fallback — see `src/server/audit/lead-log.ts`.
+  No client Firebase SDK. PDFs are stored on the report document (`pdfBase64`).
+
+## Conventions
+
+- All visitor-facing branding/copy constants (company name, presenter, CTA label, event name,
+  site URL) live in `src/lib/site-config.ts` — import `SITE` from there, never hardcode strings.
+- Server-only AI code stays under `src/server/`, imported only from route handlers or other
+  server-only modules — never from a `"use client"` component.
+- Client components fetch via plain `fetch()` — there is no auth wrapper (`authFetch`) in this
+  project, unlike the parent `SitecoreAiDemoSenario` repo it was forked from.
+- Tables/report blocks reuse the same shared visual language as the parent repo's Scrunch
+  workspace (rounded cards, `#8629ff` accent, `#17141f` dark panels) for a consistent brand feel.
+
+## Docs
+
+- README.md — overview, how to run locally, how the audit works
+- AGENTS.md — paths and conventions for AI coding agents
+
+## Deploy
+
+Vercel (or similar): set `GEMINI_API_KEY` (required), `FIREBASE_SERVICE_ACCOUNT_JSON` and
+`NEXT_PUBLIC_FIREBASE_PROJECT_ID` (required to persist leads), `LEADS_ADMIN_SECRET` (stand desk),
+`GEMINI_MODEL` (optional, defaults to `gemini-2.5-flash`), `NEXT_PUBLIC_SITE_URL` (optional,
+defaults to sitecore.com).

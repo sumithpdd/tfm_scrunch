@@ -1,0 +1,51 @@
+---
+description: Security rules — secrets, API routes, and rate limiting
+alwaysApply: true
+---
+
+# Security
+
+## Secrets
+
+- **Never** commit `.env.local`, `GEMINI_API_KEY`, or a real `SCRUNCH_API_TOKEN`.
+- **Never** put real API keys or Scrunch org/brand ids in README, docs, UI placeholders, or
+  `.env.example` (generic placeholders only).
+- Booth visitor names and emails live in Firestore `tmf_scrunch_leads`, visibility briefs and PDFs
+  in `tmf_scrunch_reports` (one doc per email), and the gitignored `data/leads.jsonl` fallback. Do not
+  commit PII, and do not add analytics that ships it anywhere else without asking.
+- Do not add a client Firestore SDK or security rules that let the browser read `tmf_scrunch_leads`
+  or `tmf_scrunch_reports`. Writes go through Firebase Admin only.
+
+## Server-only env vars
+
+| Variable | Purpose |
+|----------|---------|
+| `GEMINI_API_KEY` | Powers the free AEO/GEO audit generation |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Admin SDK — writes booth leads to `tmf_scrunch_leads` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Local alternative path to the service-account JSON file |
+| `LEADS_ADMIN_SECRET` | Passcode for the hidden `/stand-desk` leads page |
+| `RESEND_API_KEY` | Sends the audit PDF to the visitor ("Send me an email") |
+| `EMAIL_FROM` | Verified From address for Resend |
+| `SCRUNCH_API_TOKEN` | Not used in v1 — reserved for a future live Scrunch check |
+
+## Public API routes
+
+This project is intentionally **auth-free** — it is a public booth kiosk tool, not an internal
+admin app:
+
+- `POST /api/audit/generate` — public, but rate-limited per IP in-process (see the route file);
+  keep that guard if you change this route, since it calls a paid Gemini API.
+- `POST /api/audit/email` — public, rate-limited; sends the PDF to the visitor address they typed.
+  Requires `RESEND_API_KEY` and `EMAIL_FROM`.
+- `GET /api/marketing-skills` — public, read-only, serves from code (`marketing-skills-seed.ts`).
+- `/stand-desk` and `/api/admin/leads*` — **not public**. Gated by `LEADS_ADMIN_SECRET` (httpOnly
+  cookie). Do not link this from the visitor nav. This is not Firebase Auth — it is a booth
+  passcode so visitor PII is not on an open URL.
+
+Do not add `requireApiAuth`/Firebase auth back into the kiosk routes without also adding a real
+login flow — a half-wired auth gate would just break the kiosk.
+
+## SSRF
+
+`src/server/audit/fetch-public-page.ts` fetches the visitor-supplied website for research. It
+must keep using `isSafePublicUrl()` from `src/lib/url-safety.ts` to block localhost/private IPs.

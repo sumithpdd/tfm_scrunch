@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/*
+ * Brand tokens sourced from sitecore.com (brand guidelines + Blok design system):
+ * DM Sans typeface; purple #6e3fff primary accent; red #EB001A for CTAs, forming a
+ * purple->red "power gradient" on AI-branded elements; near-black #212121 ink, not navy.
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #212121;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-serif: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
