@@ -1223,9 +1223,15 @@ export function StandDeskView() {
           )}
         </section>
 
-        <section className="xl:sticky xl:top-24 xl:self-start">
+        <section className={reportFullscreen ? undefined : "xl:sticky xl:top-24 xl:self-start"}>
           {selected ? (
-            <div className="space-y-4 rounded-2xl border border-[#ece4ff] bg-white p-5">
+            <div
+              className={
+                reportFullscreen
+                  ? "fixed inset-0 z-[80] space-y-4 overflow-y-auto bg-white p-5 sm:p-8"
+                  : "space-y-4 rounded-2xl border border-[#ece4ff] bg-white p-5"
+              }
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6e3fff]">Selected</p>
@@ -1294,10 +1300,10 @@ export function StandDeskView() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setReportFullscreen(true)}
+                    onClick={() => setReportFullscreen((open) => !open)}
                     className="rounded-[0.625rem] border border-zinc-200 px-3 py-1.5 text-sm font-semibold"
                   >
-                    Full screen
+                    {reportFullscreen ? "Exit full screen" : "Full screen"}
                   </button>
                   <button
                     type="button"
@@ -1467,7 +1473,7 @@ export function StandDeskView() {
                 onRerun={onRerun}
                 onReplacePdf={onReplacePdf}
                 busy={busy}
-                fullscreen={false}
+                fullscreen={reportFullscreen}
               />
             </div>
           ) : (
@@ -1478,46 +1484,6 @@ export function StandDeskView() {
           )}
         </section>
       </div>
-
-      {reportFullscreen && selected ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-[#faf8ff]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ece4ff] bg-white px-5 py-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6e3fff]">Full screen</p>
-              <h2 className="font-serif text-xl font-semibold text-[#212121]">
-                {selected.company || selected.auditedBrand}
-              </h2>
-              <p className="text-sm text-zinc-500">
-                {hostLabel(selected.auditedWebsite)}
-                {selected.email ? ` · ${selected.email}` : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReportFullscreen(false)}
-              className="rounded-[0.625rem] bg-[#212121] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Exit full screen
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
-            <SelectedReportPanels
-              selected={selected}
-              isSuper={isSuper}
-              detailTab={detailTab}
-              setDetailTab={setDetailTab}
-              visibilityReport={visibilityReport}
-              shareLead={shareLead}
-              shareReport={shareReport}
-              rerunningId={rerunningId}
-              onRerun={onRerun}
-              onReplacePdf={onReplacePdf}
-              busy={busy}
-              fullscreen
-            />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
