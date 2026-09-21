@@ -17,7 +17,7 @@ type VisitFilter = "all" | "today";
 type ReportFilter = "all" | "scrunch" | "micro" | "none";
 type SortKey = "recent" | "company";
 
-const PAGE_SIZE = 40;
+const PAGE_SIZE = 20;
 
 function isToday(iso: string): boolean {
   if (!iso) return false;
@@ -714,12 +714,22 @@ export function StandDeskView() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pageRows = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const pageFrom = filtered.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
+  const pageTo = Math.min(filtered.length, (safePage + 1) * PAGE_SIZE);
+
+  function selectCompanyAt(index: number) {
+    const lead = filtered[index];
+    if (!lead) return;
+    setSelectedId(lead.id);
+    setPage(Math.floor(index / PAGE_SIZE));
+  }
 
   useEffect(() => {
     setPage(0);
   }, [query, visitFilter, reportFilter, sortKey, eventFilter, archiveFilter, aeFilter]);
 
   const selected = filtered.find((l) => l.id === selectedId) ?? leads.find((l) => l.id === selectedId) ?? null;
+  const selectedIndex = selected ? filtered.findIndex((l) => l.id === selected.id) : -1;
   const selectedScrunchHref = scrunchDashboardUrl(scrunchOrgId, scrunchBrandId);
   const shareLead = selected
     ? { name: selected.name, company: selected.company, email: selected.email }
@@ -862,6 +872,13 @@ export function StandDeskView() {
               className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white"
             >
               {addOpen ? "Close add" : "Add company / PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportFullscreen((open) => !open)}
+              className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(110,63,255,0.9)]"
+            >
+              {reportFullscreen ? "Exit full screen" : "Full screen"}
             </button>
             <button
               type="button"
@@ -1141,34 +1158,47 @@ export function StandDeskView() {
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)]">
-        <section className="rounded-2xl border border-[#ece4ff] bg-white p-4">
+      <div
+        className={
+          reportFullscreen
+            ? "fixed inset-0 z-[80] flex flex-col bg-[#faf8ff]"
+            : undefined
+        }
+      >
+        {reportFullscreen ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#ece4ff] bg-white px-5 py-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6e3fff]">Stand desk</p>
+              <p className="text-sm text-zinc-600">Company grid and selected details</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReportFullscreen(false)}
+              className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Exit full screen
+            </button>
+          </div>
+        ) : null}
+      <div
+        className={
+          reportFullscreen
+            ? "grid min-h-0 flex-1 gap-4 overflow-hidden p-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(28rem,1fr)]"
+            : "grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40rem)]"
+        }
+      >
+        <section
+          className={`rounded-2xl border border-[#ece4ff] bg-white p-4 ${
+            reportFullscreen ? "flex min-h-0 flex-col overflow-hidden" : ""
+          }`}
+        >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-zinc-600">
             <p>
-              Showing {pageRows.length} of {filtered.length}
+              Showing {pageFrom}–{pageTo} of {filtered.length}
               {filtered.length !== leads.length ? ` (filtered from ${leads.length})` : ""}
+              <span className="text-zinc-400"> · 20 per page</span>
             </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={safePage === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold disabled:opacity-40"
-              >
-                Prev
-              </button>
-              <span>
-                Page {safePage + 1} / {pageCount}
-              </span>
-              <button
-                type="button"
-                disabled={safePage >= pageCount - 1}
-                onClick={() => setPage((p) => p + 1)}
-                className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
+            <Pager page={safePage} pageCount={pageCount} onPage={setPage} />
           </div>
 
           {pageRows.length === 0 ? (
@@ -1178,7 +1208,7 @@ export function StandDeskView() {
                 : "No companies match this search or filter."}
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className={reportFullscreen ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto"}>
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-zinc-500">
@@ -1201,8 +1231,9 @@ export function StandDeskView() {
                           active ? "bg-[#f4efff]" : "hover:bg-zinc-50"
                         }`}
                         onClick={() => {
-                          setSelectedId(lead.id);
-                          setDetailTab(lead.hasScrunchPdf ? "pdf" : "micro");
+                          const index = filtered.findIndex((row) => row.id === lead.id);
+                          if (index >= 0) selectCompanyAt(index);
+                          else setSelectedId(lead.id);
                         }}
                       >
                         <td className="py-2.5 pr-3">
@@ -1262,24 +1293,44 @@ export function StandDeskView() {
               </table>
             </div>
           )}
+          {filtered.length > PAGE_SIZE ? (
+            <div className="mt-3 flex justify-end">
+              <Pager page={safePage} pageCount={pageCount} onPage={setPage} />
+            </div>
+          ) : null}
         </section>
 
-        <section className={reportFullscreen ? undefined : "xl:sticky xl:top-24 xl:self-start"}>
+        <section
+          className={
+            reportFullscreen
+              ? "min-h-0 overflow-y-auto"
+              : "xl:sticky xl:top-24 xl:self-start"
+          }
+        >
           {selected ? (
-            <div
-              className={
-                reportFullscreen
-                  ? "fixed inset-0 z-[80] space-y-4 overflow-y-auto bg-white p-5 sm:p-8"
-                  : "space-y-4 rounded-2xl border border-[#ece4ff] bg-white p-5"
-              }
-            >
-              <div
-                className={
-                  reportFullscreen
-                    ? "sticky top-0 z-[81] -mx-5 -mt-5 mb-1 flex flex-wrap items-center justify-end gap-2 border-b border-[#ece4ff] bg-white px-5 py-3 sm:-mx-8 sm:-mt-8 sm:px-8"
-                    : "-mt-1 mb-1 flex flex-wrap items-center justify-end gap-2"
-                }
-              >
+            <div className="space-y-4 rounded-2xl border border-[#ece4ff] bg-white p-5">
+              <div className="-mt-1 mb-1 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={selectedIndex <= 0}
+                    onClick={() => selectCompanyAt(selectedIndex - 1)}
+                    className="rounded-[0.625rem] border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-semibold text-zinc-500">
+                    {selectedIndex >= 0 ? `${selectedIndex + 1} of ${filtered.length}` : "—"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={selectedIndex < 0 || selectedIndex >= filtered.length - 1}
+                    onClick={() => selectCompanyAt(selectedIndex + 1)}
+                    className="rounded-[0.625rem] border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setReportFullscreen((open) => !open)}
@@ -1561,6 +1612,7 @@ export function StandDeskView() {
           )}
         </section>
       </div>
+      </div>
     </div>
   );
 }
@@ -1694,6 +1746,51 @@ function SelectedReportPanels({
           ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+function Pager({
+  page,
+  pageCount,
+  onPage,
+}: {
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+}) {
+  if (pageCount <= 1) return null;
+  const buttons = Array.from({ length: pageCount }, (_, i) => i);
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        disabled={page === 0}
+        onClick={() => onPage(page - 1)}
+        className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold disabled:opacity-40"
+      >
+        Prev
+      </button>
+      {buttons.map((i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onPage(i)}
+          className={`min-w-8 rounded-lg px-2.5 py-1 text-xs font-semibold ${
+            i === page ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
+          }`}
+        >
+          {i + 1}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={page >= pageCount - 1}
+        onClick={() => onPage(page + 1)}
+        className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-semibold disabled:opacity-40"
+      >
+        Next
+      </button>
     </div>
   );
 }
