@@ -10,6 +10,8 @@ import {
   createScrunchPersona,
   lookupScrunchLive,
   patchScrunchBrand,
+  pushBrandTopics,
+  sanitizeTopicName,
   updateScrunchPersona,
 } from "@/server/scrunch/rest-client";
 import { saveLeadScrunchSetup } from "@/server/audit/lead-log";
@@ -200,13 +202,13 @@ export async function applyScrunchSync(opts: {
     case "push_topic": {
       const topic = doc.topics.find((t) => norm(t.name) === norm(action.name));
       if (!topic) throw new Error(`Topic “${action.name}” not found on the sheet.`);
-      const nextTopics = Array.from(new Set([...(live.topics || []), topic.name]));
-      const patched = await patchScrunchBrand(brandId, { key_topics: nextTopics });
-      const persisted = patched.key_topics ?? patched.topics ?? [];
-      if (!persisted.some((t) => norm(t) === norm(topic.name))) {
-        throw new Error(
-          `Scrunch accepted the topic update but did not keep “${topic.name}”. Returned topics: ${persisted.join(", ") || "none"}.`,
-        );
+      const result = await pushBrandTopics({
+        brandId,
+        current: live.topics || [],
+        add: [sanitizeTopicName(topic.name)],
+      });
+      if (result.failed.length) {
+        throw new Error(result.failed.map((f) => `${f.name}: ${f.error}`).join(" · "));
       }
       notice = `Topic “${topic.name}” added in Scrunch.`;
       break;
@@ -283,22 +285,21 @@ export async function applyScrunchSync(opts: {
           (t) => !live.topics.some((l) => norm(l) === norm(t.name)),
         );
         if (missing.length) {
-          const nextTopics = Array.from(
-            new Set([...(live.topics || []), ...missing.map((t) => t.name)]),
-          );
-          const patched = await patchScrunchBrand(brandId, { key_topics: nextTopics });
-          const persisted = new Set(
-            (patched.key_topics ?? patched.topics ?? []).map((t) => norm(t)),
-          );
-          const dropped = missing.filter((t) => !persisted.has(norm(t.name)));
-          if (dropped.length) {
-            warnings.push(
-              `Scrunch did not keep: ${dropped.map((t) => t.name).join(", ")}. Returned ${persisted.size} topic(s).`,
-            );
+          const result = await pushBrandTopics({
+            brandId,
+            current: live.topics || [],
+            add: missing.map((t) => t.name),
+          });
+          for (const fail of result.failed) {
+            warnings.push(`${fail.name}: ${fail.error}`);
           }
-          notice = `Synced ${missing.length - dropped.length} of ${missing.length} missing topic(s) to Scrunch.`;
-          if (dropped.length === missing.length) {
-            throw new Error(warnings.join(" · ") || "Scrunch did not persist the topics.");
+          const ok = missing.length - result.failed.length;
+          notice = `Synced ${ok} of ${missing.length} missing topic(s) to Scrunch.`;
+          if (!ok) {
+            throw new Error(
+              warnings.join(" · ") ||
+                "Scrunch returned 500 updating topics. Add them in the Scrunch dashboard if this keeps failing.",
+            );
           }
         } else {
           notice = "No missing topics to sync.";

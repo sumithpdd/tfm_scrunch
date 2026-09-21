@@ -113,8 +113,70 @@ async function snapshotForBrand(
     promptTotal: prompts.total,
     personaTotal: personas.total,
     competitorTotal: competitors.total,
-    topics: brand.key_topics ?? brand.topics ?? [],
+    topics: topicNames(brand.key_topics ?? brand.topics),
   };
+}
+
+export function sanitizeTopicName(raw: string): string {
+  return raw.replace(/[\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+export function topicNames(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const name =
+      typeof item === "string"
+        ? sanitizeTopicName(item)
+        : item && typeof item === "object" && "name" in item
+          ? sanitizeTopicName(String((item as { name?: unknown }).name ?? ""))
+          : "";
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+export async function pushBrandTopics(opts: {
+  brandId: number;
+  current: string[];
+  add: string[];
+}): Promise<{ persisted: string[]; failed: { name: string; error: string }[] }> {
+  const current = topicNames(opts.current);
+  const add = topicNames(opts.add);
+  if (add.length === 0) return { persisted: current, failed: [] };
+
+  const bulk = topicNames([...current, ...add]);
+  try {
+    const brand = await patchScrunchBrand(opts.brandId, { key_topics: bulk });
+    return { persisted: topicNames(brand.key_topics ?? brand.topics ?? bulk), failed: [] };
+  } catch (err: unknown) {
+    const bulkError = err instanceof Error ? err.message : String(err);
+    if (!/\b500\b/.test(bulkError)) throw err;
+  }
+
+  const persisted = [...current];
+  const failed: { name: string; error: string }[] = [];
+  for (const name of add) {
+    try {
+      const brand = await patchScrunchBrand(opts.brandId, {
+        key_topics: topicNames([...persisted, name]),
+      });
+      const next = topicNames(brand.key_topics ?? brand.topics ?? [...persisted, name]);
+      persisted.splice(0, persisted.length, ...next);
+    } catch (err: unknown) {
+      failed.push({ name, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  if (failed.length === add.length) {
+    throw new Error(
+      `Scrunch returned 500 updating topics for this brand. Add them in the Scrunch dashboard if this keeps failing. ${failed[0]?.error || ""}`,
+    );
+  }
+  return { persisted, failed };
 }
 
 export async function lookupScrunchLive(opts: {

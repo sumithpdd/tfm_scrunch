@@ -1278,6 +1278,31 @@ export function StandDeskView() {
                   : "space-y-4 rounded-2xl border border-[#ece4ff] bg-white p-5"
               }
             >
+              <div
+                className={
+                  reportFullscreen
+                    ? "sticky top-0 z-[81] -mx-5 -mt-5 mb-1 flex flex-wrap items-center justify-end gap-2 border-b border-[#ece4ff] bg-white px-5 py-3 sm:-mx-8 sm:-mt-8 sm:px-8"
+                    : "-mt-1 mb-1 flex flex-wrap items-center justify-end gap-2"
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() => setReportFullscreen((open) => !open)}
+                  className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(110,63,255,0.9)]"
+                >
+                  {reportFullscreen ? "Exit full screen" : "Full screen"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportFullscreen(false);
+                    setSelectedId(null);
+                  }}
+                  className="rounded-[0.625rem] border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700"
+                >
+                  Close
+                </button>
+              </div>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6e3fff]">Selected</p>
@@ -1342,25 +1367,6 @@ export function StandDeskView() {
                       </div>
                     </label>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setReportFullscreen((open) => !open)}
-                    className="rounded-[0.625rem] border border-zinc-200 px-3 py-1.5 text-sm font-semibold"
-                  >
-                    {reportFullscreen ? "Exit full screen" : "Full screen"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReportFullscreen(false);
-                      setSelectedId(null);
-                    }}
-                    className="text-sm font-semibold text-zinc-500"
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
 
