@@ -2,7 +2,9 @@
 
 import type { StoredBoothLead } from "@/lib/audit-types";
 import type { ScrunchConnectDiff, ScrunchSyncAction } from "@/lib/scrunch-diff-types";
+import type { ScrunchBrandSetupDoc } from "@/lib/scrunch-setup-types";
 import { ScrunchConnectPanel } from "@/components/scrunch-connect-panel";
+import { ScrunchWizardPaste } from "@/components/scrunch-wizard-paste";
 
 export function ScrunchSetupPanel({
   lead,
@@ -24,26 +26,43 @@ export function ScrunchSetupPanel({
   const setup = lead.scrunchSetup;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-[#ece4ff] bg-[#faf8ff] p-4">
+    <div className="space-y-4 rounded-2xl border border-[#ece4ff] bg-[#faf8ff] p-4">
       <div>
         <p className="text-sm font-medium text-[#212121]">Scrunch brand setup</p>
         <p className="mt-1 text-xs leading-5 text-zinc-500">
-          Super admin only. Generate personas, topics, competitors, and prompt seeds, then compare
-          and sync them into the live Scrunch brand.
+          Super admin only. Review the full sheet, then compare and sync description, personas,
+          competitors, and topics into the live Scrunch brand.
         </p>
       </div>
+
+      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+        <Detail label="Brand" value={lead.auditedBrand || lead.company} />
+        <Detail label="Website" value={lead.auditedWebsite || setup?.website || "—"} />
+        <Detail label="Country" value={setup?.primaryCountryLabel || setup?.primaryCountry || "—"} />
+        <Detail
+          label="Created by"
+          value={setup?.createdByEmail || setup?.createdByUid || lead.aeEmail || lead.email || "—"}
+        />
+        <Detail label="AE" value={lead.aeName ? `${lead.aeName} · ${lead.aeEmail}` : lead.aeEmail || "—"} />
+        <Detail
+          label="Scrunch ids"
+          value={
+            lead.scrunchBrandId
+              ? `brand ${lead.scrunchBrandId}${lead.scrunchOrgId ? ` · org ${lead.scrunchOrgId}` : ""}`
+              : "Not connected yet"
+          }
+        />
+      </dl>
+
       {setup ? (
         <p className="text-sm text-zinc-600">
           {setup.counts.personas} personas · {setup.counts.topics} topics · {setup.counts.competitors}{" "}
           competitors · {setup.counts.seeds} prompts
-          {setup.primaryCountryLabel ? ` · ${setup.primaryCountryLabel}` : ""}
-          {setup.createdByEmail || setup.createdByUid
-            ? ` · created by ${setup.createdByEmail || setup.createdByUid}`
-            : ""}
         </p>
       ) : (
         <p className="text-sm text-zinc-500">No Scrunch build sheet yet for this company.</p>
       )}
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -62,13 +81,167 @@ export function ScrunchSetupPanel({
           Compare to Scrunch
         </button>
       </div>
-      {setup?.description ? (
-        <p className="text-sm leading-6 text-zinc-700">{setup.description}</p>
-      ) : null}
+
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       {diff ? (
         <ScrunchConnectPanel diff={diff} busy={busy} onSync={onSync} onRefresh={onConnect} />
       ) : null}
+
+      {setup ? <ScrunchSetupDetails setup={setup} /> : null}
     </div>
+  );
+}
+
+function ScrunchSetupDetails({ setup }: { setup: ScrunchBrandSetupDoc }) {
+  return (
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-[#ece8f8] bg-white p-4">
+        <h3 className="font-serif text-lg font-semibold">Counts</h3>
+        {setup.scopeDecision ? <p className="mt-2 text-sm text-zinc-600">{setup.scopeDecision}</p> : null}
+        <dl className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+          <Stat label="Topics" value={setup.counts.topics} />
+          <Stat label="Personas" value={setup.counts.personas} />
+          <Stat label="Competitors" value={setup.counts.competitors} />
+          <Stat label="Seeds" value={setup.counts.seeds} />
+          <Stat label="Non-branded %" value={setup.counts.nonBrandedPct} />
+          <Stat label="Variants est." value={setup.counts.variantsEstimate} />
+          <Stat label="Country" value={setup.primaryCountry || "—"} />
+          <Stat label="Language" value={setup.defaultLanguage || "—"} />
+        </dl>
+      </section>
+
+      {setup.description ? (
+        <section className="rounded-2xl border border-[#ece8f8] bg-white p-4">
+          <h3 className="font-serif text-lg font-semibold">Brand description</h3>
+          <p className="mt-2 text-sm leading-6 text-zinc-700">{setup.description}</p>
+        </section>
+      ) : null}
+
+      <MarkdownBlock title="§0 Brief" body={setup.briefMarkdown} />
+      <MarkdownBlock title="Bias check" body={setup.biasNotes} />
+      <MarkdownBlock title="Wizard handoff" body={setup.wizardHandoff} />
+
+      <TableBlock
+        title="Personas"
+        headers={["Name", "Description"]}
+        rows={setup.personas.map((p) => [p.name, p.description])}
+      />
+      <TableBlock
+        title="Topics"
+        headers={["Name", "Description"]}
+        rows={setup.topics.map((t) => [t.name, t.description])}
+      />
+      <TableBlock
+        title="Competitors"
+        headers={["Name", "Alt names", "Website", "Why"]}
+        rows={setup.competitors.map((c) => [c.name, c.altNames, c.website, c.whyInScope])}
+      />
+      <TableBlock
+        title="Prompts"
+        headers={["Prompt", "Topic", "Persona", "Stage", "Branded"]}
+        rows={setup.prompts.map((p) => [
+          p.prompt,
+          p.topics,
+          p.personas,
+          p.stage,
+          p.branded ? "yes" : "no",
+        ])}
+      />
+      <TableBlock
+        title="Hypotheses"
+        headers={["Expect", "Because", "Confirmed by", "Refuted by"]}
+        rows={setup.hypotheses.map((h) => [h.expect, h.because, h.confirmedBy, h.refutedBy])}
+      />
+      <TableBlock
+        title="Open questions"
+        headers={["Question", "Blocks", "How to settle"]}
+        rows={setup.openQuestions.map((q) => [q.question, q.blocks, q.howToSettle])}
+      />
+      <TableBlock
+        title="Alternative names"
+        headers={["Name", "Why"]}
+        rows={setup.alternativeNames.map((a) => [a.name, a.why])}
+      />
+      <TableBlock
+        title="Alternative websites"
+        headers={["URL", "Ownership"]}
+        rows={setup.alternativeWebsites.map((a) => [a.url, a.ownership])}
+      />
+
+      <ScrunchWizardPaste doc={setup} />
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white px-3 py-2">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{label}</dt>
+      <dd className="mt-0.5 break-all text-sm text-[#212121]">{value}</dd>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl bg-zinc-50 px-3 py-2">
+      <dt className="text-xs text-zinc-500">{label}</dt>
+      <dd className="font-semibold text-[#212121]">{value}</dd>
+    </div>
+  );
+}
+
+function MarkdownBlock({ title, body }: { title: string; body: string }) {
+  if (!body) return null;
+  return (
+    <section className="rounded-2xl border border-[#ece8f8] bg-white p-4">
+      <h3 className="font-serif text-lg font-semibold">{title}</h3>
+      <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap text-sm leading-6 text-zinc-700">
+        {body}
+      </pre>
+    </section>
+  );
+}
+
+function TableBlock({
+  title,
+  headers,
+  rows,
+}: {
+  title: string;
+  headers: string[];
+  rows: string[][];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-[#ece8f8] bg-white p-4">
+      <h3 className="font-serif text-lg font-semibold">
+        {title} <span className="text-sm font-normal text-zinc-400">({rows.length})</span>
+      </h3>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[520px] text-left text-sm">
+          <thead>
+            <tr className="border-b text-xs uppercase tracking-wide text-zinc-500">
+              {headers.map((h) => (
+                <th key={h} className="py-2 pr-3 font-semibold">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-b border-zinc-100 align-top">
+                {row.map((cell, j) => (
+                  <td key={j} className="py-2 pr-3 text-zinc-700">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
