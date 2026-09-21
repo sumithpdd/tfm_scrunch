@@ -186,7 +186,7 @@ export function ScrunchConnectPanel({
 
           <DiffSection
             title="Topics"
-            summary={`${diff.counts.topicsMissing} missing · ${diff.counts.topicsOnlyLive} only in Scrunch`}
+            summary={`${diff.counts.topicsMissing} missing · ${diff.counts.topicsOnlyLive} only in Scrunch. Scrunch's API currently 500s on topic writes — add missing ones in the dashboard.`}
             onPushAll={
               diff.counts.topicsMissing
                 ? () => onSync({ type: "push_all_missing", section: "topics" })

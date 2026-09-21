@@ -1221,16 +1221,8 @@ export function StandDeskView() {
                         </td>
                         <td className="py-2.5 pr-3">
                           <div className="flex flex-wrap gap-1">
-                            {lead.hasScrunchPdf ? (
-                              <span className="rounded-full bg-[#ece4ff] px-2 py-0.5 text-[11px] font-semibold text-[#4715af]">
-                                Scrunch PDF
-                              </span>
-                            ) : null}
-                            {lead.lastReport ? (
-                              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-700">
-                                Micro-audit
-                              </span>
-                            ) : null}
+                            {lead.hasScrunchPdf ? <DoneChip label="Scrunch PDF" /> : null}
+                            {lead.lastReport ? <DoneChip label="Micro-audit" /> : null}
                             {lead.archived ? (
                               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                                 Archived
@@ -1246,13 +1238,16 @@ export function StandDeskView() {
                                 href={scrunchHref}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="rounded-full bg-[#212121] px-2 py-0.5 text-[11px] font-semibold text-white"
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800"
                                 onClick={(e) => e.stopPropagation()}
                               >
+                                <span aria-hidden>✓</span>
                                 Scrunch
                               </a>
+                            ) : lead.scrunchBrandId ? (
+                              <DoneChip label="Scrunch" />
                             ) : null}
-                            {!lead.hasScrunchPdf && !lead.lastReport ? (
+                            {!lead.hasScrunchPdf && !lead.lastReport && !lead.scrunchBrandId ? (
                               <span className="text-xs text-zinc-400">None</span>
                             ) : null}
                           </div>
@@ -1700,6 +1695,15 @@ function SelectedReportPanels({
         </div>
       )}
     </div>
+  );
+}
+
+function DoneChip({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+      <span aria-hidden>✓</span>
+      {label}
+    </span>
   );
 }
 

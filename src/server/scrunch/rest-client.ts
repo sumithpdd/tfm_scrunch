@@ -155,28 +155,13 @@ export async function pushBrandTopics(opts: {
     return { persisted: topicNames(brand.key_topics ?? brand.topics ?? bulk), failed: [] };
   } catch (err: unknown) {
     const bulkError = err instanceof Error ? err.message : String(err);
-    if (!/\b500\b/.test(bulkError)) throw err;
-  }
-
-  const persisted = [...current];
-  const failed: { name: string; error: string }[] = [];
-  for (const name of add) {
-    try {
-      const brand = await patchScrunchBrand(opts.brandId, {
-        key_topics: topicNames([...persisted, name]),
-      });
-      const next = topicNames(brand.key_topics ?? brand.topics ?? [...persisted, name]);
-      persisted.splice(0, persisted.length, ...next);
-    } catch (err: unknown) {
-      failed.push({ name, error: err instanceof Error ? err.message : String(err) });
+    if (/\b500\b/.test(bulkError)) {
+      throw new Error(
+        "Scrunch's Configuration API rejects topic writes (PATCH /brands/{id} key_topics → 500), even when sending the brand's current topics unchanged. There is no other topics endpoint. Add or edit topics in the Scrunch dashboard (Configure → Topics). Description, personas, and competitors can still sync via API.",
+      );
     }
+    throw err;
   }
-  if (failed.length === add.length) {
-    throw new Error(
-      `Scrunch returned 500 updating topics for this brand. Add them in the Scrunch dashboard if this keeps failing. ${failed[0]?.error || ""}`,
-    );
-  }
-  return { persisted, failed };
 }
 
 export async function lookupScrunchLive(opts: {
