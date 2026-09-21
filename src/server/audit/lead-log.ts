@@ -452,6 +452,14 @@ export async function updateLeadAe(
   return saved;
 }
 
+function toFirestoreJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export function createdByEmailForLead(lead: { aeEmail?: string; email?: string }): string {
+  return (lead.aeEmail || lead.email || "").trim().toLowerCase();
+}
+
 export async function saveLeadScrunchSetup(
   id: string,
   setup: ScrunchBrandSetupDoc,
@@ -464,11 +472,19 @@ export async function saveLeadScrunchSetup(
   const db = getAdminDb();
   const primary = await db.collection(LEADS_COLLECTION).doc(id).get();
   const collection = primary.exists ? LEADS_COLLECTION : LEGACY_LEADS_COLLECTION;
+  const createdBy = setup.createdByEmail || setup.createdByUid || createdByEmailForLead(existing);
+  const cleanSetup = toFirestoreJson({
+    ...setup,
+    createdByUid: createdBy,
+    createdByEmail: createdBy,
+    scrunchOrgId: setup.scrunchOrgId || existing.scrunchOrgId || "",
+    scrunchBrandId: setup.scrunchBrandId || existing.scrunchBrandId || "",
+  });
   await db.collection(collection).doc(id).set(
     {
-      scrunchSetup: setup,
-      scrunchOrgId: setup.scrunchOrgId || existing.scrunchOrgId,
-      scrunchBrandId: setup.scrunchBrandId || existing.scrunchBrandId,
+      scrunchSetup: cleanSetup,
+      scrunchOrgId: cleanSetup.scrunchOrgId || existing.scrunchOrgId || "",
+      scrunchBrandId: cleanSetup.scrunchBrandId || existing.scrunchBrandId || "",
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },

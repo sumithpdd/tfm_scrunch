@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forbiddenForAEs, getStandDeskRole } from "@/server/admin/stand-desk-auth";
-import { getLeadById, saveLeadScrunchSetup } from "@/server/audit/lead-log";
+import { createdByEmailForLead, getLeadById, saveLeadScrunchSetup } from "@/server/audit/lead-log";
 import { generateScrunchSetup } from "@/server/scrunch/brand-setup.service";
+import { SITE } from "@/lib/site-config";
 
 export const maxDuration = 120;
 
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Company not found." }, { status: 404 });
     }
 
+    const createdBy = createdByEmailForLead(lead) || SITE.defaultVisitorEmail;
     const { doc, error } = await generateScrunchSetup({
       setupId: lead.id,
       brandName: lead.auditedBrand || lead.company,
@@ -31,10 +33,11 @@ export async function POST(request: NextRequest) {
         ? [{ name: lead.aeName || "Account exec", email: lead.aeEmail }]
         : [],
       successMeasures: [],
-      scrunchOrgId: lead.scrunchOrgId,
-      scrunchBrandId: lead.scrunchBrandId,
+      createdByUid: createdBy,
+      scrunchOrgId: lead.scrunchOrgId || "",
+      scrunchBrandId: lead.scrunchBrandId || "",
       regenerate: Boolean(lead.scrunchSetup),
-      previousSummary: lead.scrunchSetup?.briefMarkdown,
+      previousSummary: lead.scrunchSetup?.briefMarkdown || "",
     });
 
     if (error && !doc.description && !doc.personas.length) {
@@ -43,8 +46,10 @@ export async function POST(request: NextRequest) {
 
     const saved = await saveLeadScrunchSetup(lead.id, {
       ...doc,
-      scrunchOrgId: lead.scrunchOrgId || doc.scrunchOrgId,
-      scrunchBrandId: lead.scrunchBrandId || doc.scrunchBrandId,
+      createdByUid: createdBy,
+      createdByEmail: createdBy,
+      scrunchOrgId: lead.scrunchOrgId || doc.scrunchOrgId || "",
+      scrunchBrandId: lead.scrunchBrandId || doc.scrunchBrandId || "",
     });
     return NextResponse.json(
       { success: true, setup: saved.scrunchSetup, lead: saved, warning: error },

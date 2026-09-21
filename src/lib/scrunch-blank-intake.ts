@@ -50,6 +50,8 @@ export function emptyScrunchIntakeDoc(): ScrunchBrandSetupDoc {
     status: "INTAKE",
     scrunchOrgId: "",
     scrunchBrandId: "",
+    createdByUid: "",
+    createdByEmail: "",
     source: "intake",
     skillSourceUrl: "https://github.com/rjzflynnbx/scrunch-brand-setup-v1",
   };

@@ -37,6 +37,9 @@ export function ScrunchSetupPanel({
           {setup.counts.personas} personas · {setup.counts.topics} topics · {setup.counts.competitors}{" "}
           competitors · {setup.counts.seeds} prompts
           {setup.primaryCountryLabel ? ` · ${setup.primaryCountryLabel}` : ""}
+          {setup.createdByEmail || setup.createdByUid
+            ? ` · created by ${setup.createdByEmail || setup.createdByUid}`
+            : ""}
         </p>
       ) : (
         <p className="text-sm text-zinc-500">No Scrunch build sheet yet for this company.</p>

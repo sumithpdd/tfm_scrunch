@@ -91,7 +91,9 @@ export type ScrunchBrandSetupDoc = {
   scrunchOrgId?: string;
   /** Scrunch brand id after create (from Scrunch UI). Used with MCP / API. Never hardcode real ids in source. */
   scrunchBrandId?: string;
-  createdByUid?: string;
+  /** Email of the AE or visitor who owns this setup — never leave undefined for Firestore. */
+  createdByUid: string;
+  createdByEmail: string;
   source: "gemini" | "intake";
   skillSourceUrl: string;
   updatedAt?: unknown;
