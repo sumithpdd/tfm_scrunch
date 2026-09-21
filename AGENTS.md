@@ -41,10 +41,11 @@ own device. Secondary audience: Sitecore/Scrunch sellers reusing the prompt libr
 | Visibility reports + PDFs | `src/server/audit/report-store.ts` (Firestore `tmf_scrunch_reports`, one doc per website) |
 | Firebase Admin | `src/lib/firebase-admin.ts`, `src/server/db/firestore-admin.ts` |
 | Marketing skills catalog | `src/lib/marketing-skills-seed.ts`, `src/components/marketing-skills-view.tsx` |
-| Marketing skills API | `src/app/api/marketing-skills/route.ts` |
+| Marketing skills API | `src/app/api/marketing-skills/route.ts`, `src/app/api/marketing-skills/email/route.ts` |
 | Stand desk (hidden leads UI) | `src/app/stand-desk/page.tsx`, `src/components/stand-desk-view.tsx` |
 | Scrunch PDF store | `src/server/audit/pdf-store.ts`, `src/app/api/admin/reports/pdf/route.ts` |
-| Stand desk API | `src/app/api/admin/leads/route.ts`, `src/app/api/admin/leads/session/route.ts` |
+| Stand desk API | `src/app/api/admin/leads/route.ts`, `src/app/api/admin/leads/session/route.ts`, `src/app/api/admin/leads/seed/route.ts` |
+| Scrunch brand setup (super) | `src/server/scrunch/brand-setup.service.ts`, `src/app/api/admin/scrunch/generate/route.ts`, `src/app/api/admin/scrunch/connect/route.ts`, `src/app/api/admin/scrunch/entity-sync/route.ts` |
 | Report PDF | `src/lib/report-pdf.ts`, `src/components/report-share-actions.tsx` |
 | Email report | `src/app/api/audit/email/route.ts` (Resend; needs `RESEND_API_KEY` + `EMAIL_FROM`) |
 

@@ -1,0 +1,56 @@
+import type { ScrunchBrandSetupDoc } from "@/lib/scrunch-setup-types";
+
+export const DEFAULT_SCRUNCH_SUCCESS_MEASURES = [
+  "AI visibility and share of voice",
+  "Brand citation frequency",
+  "Competitor benchmarking",
+  "Content optimisation opportunities",
+  "Monitoring inaccurate AI answers",
+];
+
+export function emptyScrunchIntakeDoc(): ScrunchBrandSetupDoc {
+  return {
+    setupId: "",
+    brandName: "",
+    website: "",
+    relationship: "customer",
+    primaryCountry: "",
+    primaryCountryLabel: "",
+    defaultLanguage: "en",
+    caseSensitive: false,
+    description: "",
+    alternativeNames: [],
+    alternativeWebsites: [],
+    competitors: [],
+    removedCompetitors: [],
+    subBrands: [],
+    personas: [],
+    topics: [],
+    prompts: [],
+    counts: {
+      topics: 0,
+      competitors: 0,
+      personas: 0,
+      seeds: 0,
+      nonBrandedCount: 0,
+      nonBrandedPct: 0,
+      platforms: 9,
+      variantsEstimate: 0,
+    },
+    hypotheses: [],
+    openQuestions: [],
+    briefMarkdown: "",
+    scopeDecision: "",
+    wizardHandoff: "",
+    biasNotes: "",
+    intakeNotes: "",
+    stakeholders: [],
+    successMeasures: DEFAULT_SCRUNCH_SUCCESS_MEASURES,
+    geographicScope: "Infer one primary market from the website",
+    status: "INTAKE",
+    scrunchOrgId: "",
+    scrunchBrandId: "",
+    source: "intake",
+    skillSourceUrl: "https://github.com/rjzflynnbx/scrunch-brand-setup-v1",
+  };
+}

@@ -119,6 +119,17 @@ export async function getVisibilityReportByWebsite(
   );
 }
 
+export async function updateReportEmailByWebsite(website: string, email: string): Promise<void> {
+  if (!isServerFirestoreAvailable()) return;
+  const cleaned = email.trim().toLowerCase();
+  if (!website.trim() || !cleaned) return;
+  const id = websiteDocId(website);
+  const ref = getAdminDb().collection(REPORTS_COLLECTION).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  await ref.set({ email: cleaned, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+}
+
 export async function getVisibilityReportByEmail(email: string): Promise<StoredVisibilityReport | null> {
   if (!isServerFirestoreAvailable()) {
     throw new Error("Firestore is not configured");

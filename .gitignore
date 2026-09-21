@@ -47,3 +47,5 @@ yarn-error.log*
 # booth lead capture (PII)
 /data/leads.jsonl
 /data/*.jsonl
+
+.vercel

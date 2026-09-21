@@ -11,6 +11,8 @@ export const SITE = {
   productName: "Scrunch",
   presenterName: "Sumith Damodaran",
   presenterEmail: process.env.NEXT_PUBLIC_PRESENTER_EMAIL?.trim() || "",
+  /** Prefill so booth visitors can run an audit without sharing their address. */
+  defaultVisitorEmail: "spd@sitecore.net",
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://www.sitecore.com/",
   ctaLabel: "Get your free AEO/GEO audit",
   demoCtaLabel: "Book a demo",

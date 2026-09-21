@@ -1,15 +1,12 @@
 import type { MarketingSkillDoc } from "@/lib/marketing-skills-types";
 
-export const DUST_SEO_AGENTS_FRAME_URL =
-  "https://app.dust.tt/share/frame/e09ed1a1-1050-40fa-b05f-b483dab313f3";
-
 function skill(
   partial: Omit<MarketingSkillDoc, "enabled"> & { enabled?: boolean },
 ): MarketingSkillDoc {
   return { enabled: true, ...partial };
 }
 
-/** Dust SEO_Agents_v3 catalog + enriched Sitecore marketing skills */
+/** Sitecore + Scrunch prompt library — packaged as Claude-ready skills. */
 export const MARKETING_SKILLS_SEED: MarketingSkillDoc[] = [
   skill({
     skillId: "seo-keyword-monitor",
@@ -43,8 +40,7 @@ Constraints
 - If no keywords qualify, state it clearly and do not modify the sheet.
 - If a keyword returns no SERP results, skip it entirely.`,
     sortOrder: 10,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "serp-deep-dive",
@@ -93,8 +89,7 @@ Rules
 - Mark unavailable if a page cannot be opened.
 - Suggestions only appear in Step 4.`,
     sortOrder: 20,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "content-gap-analyzer",
@@ -141,8 +136,7 @@ GUARDRAILS
 - Mark unknown where data is not available.
 - Cite URLs for all competitor references.`,
     sortOrder: 30,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "content-brief-writer",
@@ -184,8 +178,7 @@ OUTPUT - Full Content Brief
 
 Keep the brief to one page. Make it immediately actionable.`,
     sortOrder: 40,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "blog-post-writer",
@@ -230,8 +223,7 @@ OUTPUT
 - Meta description (under 160 chars)
 - 3 suggested internal link anchors with [LINK] markers`,
     sortOrder: 50,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "meta-generator",
@@ -270,8 +262,7 @@ RULES
 - Avoid "ultimate guide", "everything you need to know", or "[Year]" unless genuinely useful.
 - Prioritize clarity over cleverness.`,
     sortOrder: 60,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "content-refresher",
@@ -313,8 +304,7 @@ OUTPUT - Refresh Plan
 
 Every edit should have a clear reason tied to current SERP reality.`,
     sortOrder: 70,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "faq-generator",
@@ -356,8 +346,7 @@ RULES
 - Keep reading level consistent with the article audience.
 - Avoid repeating the same phrasing across multiple answers.`,
     sortOrder: 80,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "seo-reporting",
@@ -403,8 +392,7 @@ OUTPUT
 
 Highlight anomalies and quick wins clearly.`,
     sortOrder: 90,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "geo-insight",
@@ -467,8 +455,7 @@ OUTPUT
 - 5 ranked actions
 - Platform-by-platform breakdown table`,
     sortOrder: 100,
-    source: "dust",
-    sourceUrl: DUST_SEO_AGENTS_FRAME_URL,
+    source: "sitecore",
   }),
   skill({
     skillId: "seo-audit",

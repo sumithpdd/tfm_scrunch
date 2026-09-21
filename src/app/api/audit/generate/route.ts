@@ -45,12 +45,13 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    if (!lead?.name?.trim() || !lead?.email?.trim()) {
+    if (!lead?.name?.trim()) {
       return NextResponse.json(
-        { success: false, error: "Name and email are required to run the free audit." },
+        { success: false, error: "Name is required to run the free audit." },
         { status: 400 },
       );
     }
+    const visitorEmail = lead.email?.trim() || SITE.defaultVisitorEmail;
     if (body.consentAccepted !== true) {
       return NextResponse.json(
         { success: false, error: SITE.consentLabel },
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     const { report, error } = await generateAeoAudit({ brandName, website });
 
     await logLead(
-      { name: lead.name.trim(), company: lead.company?.trim() ?? "", email: lead.email.trim() },
+      { name: lead.name.trim(), company: lead.company?.trim() ?? "", email: visitorEmail },
       brandName,
       website,
       error && report.source === "fallback" ? null : snapshotFromReport(report),
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     await saveVisibilityReport({
-      lead: { name: lead.name.trim(), company: lead.company?.trim() ?? "", email: lead.email.trim() },
+      lead: { name: lead.name.trim(), company: lead.company?.trim() ?? "", email: visitorEmail },
       brandName,
       website,
       report,

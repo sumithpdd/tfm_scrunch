@@ -10,7 +10,7 @@ export function LeadCaptureHero() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState<string>(SITE.defaultVisitorEmail);
   const [website, setWebsite] = useState("");
   const [eventCode, setEventCode] = useState<BoothEventCode>(DEFAULT_BOOTH_EVENT);
   const [consentAccepted, setConsentAccepted] = useState(false);
@@ -65,7 +65,8 @@ export function LeadCaptureHero() {
               type="email"
               value={email}
               onChange={setEmail}
-              placeholder="jamie@acme.com"
+              placeholder={SITE.defaultVisitorEmail}
+              hint="Leave this if you prefer not to share yours. Change it after the audit if you want the PDF emailed to you."
             />
             <Field
               label="Website URL"
@@ -110,12 +111,14 @@ function Field({
   onChange,
   placeholder,
   type = "text",
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   type?: string;
+  hint?: string;
 }) {
   return (
     <label className="block text-base font-medium text-zinc-700">
@@ -128,6 +131,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint ? <p className="mt-1.5 text-xs font-normal leading-5 text-zinc-500">{hint}</p> : null}
     </label>
   );
 }

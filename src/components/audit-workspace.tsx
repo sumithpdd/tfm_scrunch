@@ -50,7 +50,7 @@ export function AuditWorkspace() {
   const [lead, setLead] = useState<AeoLead>({
     name: params.get("name") ?? "",
     company: params.get("company") ?? "",
-    email: params.get("email") ?? "",
+    email: params.get("email")?.trim() || SITE.defaultVisitorEmail,
   });
   const [brandName, setBrandName] = useState(params.get("company") ?? "");
   const [website, setWebsite] = useState(params.get("website") ?? "");
@@ -163,7 +163,11 @@ export function AuditWorkspace() {
               value={lead.email}
               onChange={(e) => setLead((l) => ({ ...l, email: e.target.value }))}
             />
-            </label>
+            <p className="mt-1.5 text-xs font-normal leading-5 text-zinc-500">
+              Prefills {SITE.defaultVisitorEmail} so you can run the audit now. Change it here
+              after the report if you want the PDF emailed to you.
+            </p>
+          </label>
           </div>
           <label className="mt-4 block text-base font-medium">
             Event

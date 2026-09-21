@@ -3,6 +3,7 @@ import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { FieldValue, type DocumentData, type Timestamp } from "firebase-admin/firestore";
 import type { AeoLead, MentionRateSnapshot, StoredBoothLead } from "@/lib/audit-types";
+import type { ScrunchBrandSetupDoc } from "@/lib/scrunch-setup-types";
 import {
   type BoothEventCode,
   boothEventName,
@@ -191,6 +192,8 @@ function mapLeadDoc(id: string, data: DocumentData): StoredBoothLead {
     name: String(data.name ?? ""),
     company: String(data.company ?? ""),
     email: String(data.email ?? ""),
+    aeName: String(data.aeName ?? ""),
+    aeEmail: String(data.aeEmail ?? ""),
     auditedBrand: String(data.auditedBrand ?? ""),
     auditedWebsite: String(data.auditedWebsite ?? ""),
     eventCode: parseBoothEventCode(String(data.eventCode ?? "")),
@@ -207,13 +210,24 @@ function mapLeadDoc(id: string, data: DocumentData): StoredBoothLead {
     scrunchPdfUploadedAt: toIso(data.scrunchPdfUploadedAt) || String(data.scrunchPdfUploadedAt ?? ""),
     archived: Boolean(data.archived),
     reportHidden: Boolean(data.reportHidden),
+    scrunchSetup: asScrunchSetup(data.scrunchSetup),
   };
+}
+
+function asScrunchSetup(value: unknown): ScrunchBrandSetupDoc | null {
+  if (!value || typeof value !== "object") return null;
+  const data = value as ScrunchBrandSetupDoc;
+  if (!String(data.brandName ?? "").trim()) return null;
+  return data;
 }
 
 export function presentLeadForRole(
   lead: StoredBoothLead,
   role: "ae" | "super",
 ): StoredBoothLead | null {
+  if (role === "ae") {
+    lead = { ...lead, scrunchSetup: null };
+  }
   if (role === "ae" && lead.archived) return null;
   if (role === "ae" && lead.reportHidden) {
     return {
@@ -222,6 +236,7 @@ export function presentLeadForRole(
       hasScrunchPdf: false,
       scrunchPdfFilename: "",
       scrunchPdfUploadedAt: "",
+      scrunchSetup: null,
     };
   }
   return lead;
@@ -266,6 +281,44 @@ export async function getLeadById(id: string): Promise<StoredBoothLead | null> {
 
 export async function getLeadByWebsite(website: string): Promise<StoredBoothLead | null> {
   return getLeadById(websiteDocId(website));
+}
+
+export async function findLeadByWebsite(website: string): Promise<StoredBoothLead | null> {
+  for (const code of ["TFM", "DMEXCO", "USERGROUP"] as BoothEventCode[]) {
+    const found = await getLeadById(boothLeadDocId(website, code));
+    if (found) return found;
+  }
+  return null;
+}
+
+function emailLooksValid(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/** Booth AEs can correct the visitor email without changing the website-keyed doc. */
+export async function updateLeadEmail(id: string, email: string): Promise<StoredBoothLead> {
+  if (!isServerFirestoreAvailable()) {
+    throw new Error("Firestore is not configured");
+  }
+  const cleaned = email.trim().toLowerCase();
+  if (!emailLooksValid(cleaned)) {
+    throw new Error("A valid email is required.");
+  }
+
+  const existing = await getLeadById(id);
+  if (!existing) throw new Error("Company not found.");
+
+  const db = getAdminDb();
+  const primary = await db.collection(LEADS_COLLECTION).doc(id).get();
+  const collection = primary.exists ? LEADS_COLLECTION : LEGACY_LEADS_COLLECTION;
+  await db.collection(collection).doc(id).set(
+    { email: cleaned, updatedAt: FieldValue.serverTimestamp() },
+    { merge: true },
+  );
+
+  const saved = await getLeadById(id);
+  if (!saved) throw new Error("Could not save email.");
+  return saved;
 }
 
 async function migrateUncodedLeadsToTfm() {
@@ -318,6 +371,8 @@ export async function upsertCompanyRecord(input: {
   name?: string;
   email?: string;
   eventCode?: string;
+  aeName?: string;
+  aeEmail?: string;
   scrunchOrgId?: string;
   scrunchBrandId?: string;
   scrunchPdf?: { filename: string; storagePath: string };
@@ -353,6 +408,8 @@ export async function upsertCompanyRecord(input: {
       ...(existing.exists ? {} : { createdAt: now, auditCount: 0 }),
       ...(input.name?.trim() ? { name: input.name.trim() } : {}),
       ...(input.email?.trim() ? { email: input.email.trim().toLowerCase() } : {}),
+      ...(input.aeName?.trim() ? { aeName: input.aeName.trim() } : {}),
+      ...(input.aeEmail?.trim() ? { aeEmail: input.aeEmail.trim().toLowerCase() } : {}),
       ...(input.scrunchPdf
         ? {
             hasScrunchPdf: true,
@@ -367,6 +424,57 @@ export async function upsertCompanyRecord(input: {
 
   const saved = await getLeadById(id);
   if (!saved) throw new Error("Could not save company record.");
+  return saved;
+}
+
+export async function updateLeadAe(
+  id: string,
+  input: { aeName: string; aeEmail: string },
+): Promise<StoredBoothLead> {
+  if (!isServerFirestoreAvailable()) {
+    throw new Error("Firestore is not configured");
+  }
+  const existing = await getLeadById(id);
+  if (!existing) throw new Error("Company not found.");
+  const db = getAdminDb();
+  const primary = await db.collection(LEADS_COLLECTION).doc(id).get();
+  const collection = primary.exists ? LEADS_COLLECTION : LEGACY_LEADS_COLLECTION;
+  await db.collection(collection).doc(id).set(
+    {
+      aeName: input.aeName.trim(),
+      aeEmail: input.aeEmail.trim().toLowerCase(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+  const saved = await getLeadById(id);
+  if (!saved) throw new Error("Could not save AE.");
+  return saved;
+}
+
+export async function saveLeadScrunchSetup(
+  id: string,
+  setup: ScrunchBrandSetupDoc,
+): Promise<StoredBoothLead> {
+  if (!isServerFirestoreAvailable()) {
+    throw new Error("Firestore is not configured");
+  }
+  const existing = await getLeadById(id);
+  if (!existing) throw new Error("Company not found.");
+  const db = getAdminDb();
+  const primary = await db.collection(LEADS_COLLECTION).doc(id).get();
+  const collection = primary.exists ? LEADS_COLLECTION : LEGACY_LEADS_COLLECTION;
+  await db.collection(collection).doc(id).set(
+    {
+      scrunchSetup: setup,
+      scrunchOrgId: setup.scrunchOrgId || existing.scrunchOrgId,
+      scrunchBrandId: setup.scrunchBrandId || existing.scrunchBrandId,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+  const saved = await getLeadById(id);
+  if (!saved) throw new Error("Could not save Scrunch setup.");
   return saved;
 }
 

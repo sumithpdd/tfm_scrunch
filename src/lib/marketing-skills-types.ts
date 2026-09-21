@@ -19,7 +19,7 @@ export type MarketingSkillTool = {
   name: string;
 };
 
-export type MarketingSkillSource = "dust" | "sitecore" | "magister";
+export type MarketingSkillSource = "sitecore" | "magister";
 
 /** Prompt library document — one skill/agent per doc */
 export type MarketingSkillDoc = {
@@ -39,7 +39,6 @@ export type MarketingSkillDoc = {
   sortOrder: number;
   enabled: boolean;
   source: MarketingSkillSource;
-  /** Optional link to Dust frame or external reference */
   sourceUrl?: string;
   updatedAt?: unknown;
 };

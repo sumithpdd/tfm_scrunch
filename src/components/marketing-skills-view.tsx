@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { MarketingSkillDoc } from "@/lib/marketing-skills-types";
 import { SCRUNCH_BLOG_URL, SCRUNCH_HOME_URL } from "@/lib/marketing-skills-seed";
 import { MarketingSkillModal } from "@/components/marketing-skill-modal";
+import { SkillsClaudeBar } from "@/components/skills-claude-bar";
 import { SITE } from "@/lib/site-config";
 
 const CATEGORY_DOT: Record<string, string> = {
@@ -31,6 +32,7 @@ export function MarketingSkillsView() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<MarketingSkillDoc | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  const [pickedIds, setPickedIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,9 +58,16 @@ export function MarketingSkillsView() {
 
   const filtered = filter === "all" ? skills : skills.filter((s) => s.categoryId === filter);
   const filteredGroups = groupByCategory(filtered);
+  const picked = skills.filter((skill) => pickedIds.includes(skill.skillId));
+
+  function togglePicked(skillId: string) {
+    setPickedIds((current) =>
+      current.includes(skillId) ? current.filter((id) => id !== skillId) : [...current, skillId],
+    );
+  }
 
   return (
-    <div className="space-y-14">
+    <div className="space-y-14 pb-28">
       <header className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#6e3fff]">
           {SITE.productName} + {SITE.companyName}
@@ -67,8 +76,8 @@ export function MarketingSkillsView() {
           AI Marketing Skills
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-600">
-          A working prompt library — real agent skills with triggers, connected tools, and system
-          prompts you can copy and use today.
+          A working prompt library for Claude — pick the skills you want, download a ready-to-add
+          pack, or email the zip. Each skill includes the trigger, tools, and system prompt.
         </p>
         <p className="mt-2 text-sm font-medium text-zinc-500">
           {loading ? "Loading…" : `${skills.length} marketing skills`}
@@ -141,7 +150,7 @@ export function MarketingSkillsView() {
               Prompt library
             </p>
             <h2 className="mt-2 font-serif text-2xl font-semibold text-[#212121]">
-              Click a skill to view tools &amp; system prompt
+              Select skills for Claude, or click one to preview
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -181,18 +190,29 @@ export function MarketingSkillsView() {
                 <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {group.skills.map((skill) => (
                     <li key={skill.skillId}>
-                      <button
-                        type="button"
-                        onClick={() => setSelected(skill)}
-                        className="flex h-full w-full flex-col rounded-2xl border border-zinc-200/80 bg-white p-5 text-left shadow-[0_12px_40px_-28px_rgba(30,28,34,0.35)] transition hover:border-[#6e3fff]/30 hover:shadow-[0_16px_48px_-24px_rgba(134,41,255,0.25)]"
+                      <div
+                        className={`relative flex h-full flex-col rounded-2xl border bg-white p-5 text-left shadow-[0_12px_40px_-28px_rgba(30,28,34,0.35)] transition ${
+                          pickedIds.includes(skill.skillId)
+                            ? "border-[#6e3fff] shadow-[0_16px_48px_-24px_rgba(134,41,255,0.25)]"
+                            : "border-zinc-200/80 hover:border-[#6e3fff]/30"
+                        }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
+                        <label className="absolute right-4 top-4 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-500">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-[#6e3fff]"
+                            checked={pickedIds.includes(skill.skillId)}
+                            onChange={() => togglePicked(skill.skillId)}
+                          />
+                          Claude
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setSelected(skill)}
+                          className="flex h-full w-full flex-col text-left"
+                        >
+                        <div className="flex items-start justify-between gap-3 pr-20">
                           <h4 className="font-mono text-sm font-semibold text-[#212121]">{skill.name}</h4>
-                          {skill.source === "dust" && (
-                            <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-700">
-                              Dust
-                            </span>
-                          )}
                         </div>
                         <p className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
                           <span className={`h-1.5 w-1.5 rounded-full ${CATEGORY_DOT[skill.categoryColor]}`} />
@@ -205,7 +225,8 @@ export function MarketingSkillsView() {
                           {skill.triggerLabel}
                           {skill.tools.length > 0 && ` · ${skill.tools.length} tools`}
                         </p>
-                      </button>
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -230,6 +251,11 @@ export function MarketingSkillsView() {
       </section>
 
       {selected && <MarketingSkillModal skill={selected} onClose={() => setSelected(null)} />}
+      <SkillsClaudeBar
+        selected={picked}
+        onClear={() => setPickedIds([])}
+        onSelectAll={() => setPickedIds(filtered.map((skill) => skill.skillId))}
+      />
     </div>
   );
 }

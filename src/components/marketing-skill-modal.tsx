@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MarketingSkillDoc } from "@/lib/marketing-skills-types";
+import { claudeSkillMarkdown } from "@/lib/claude-skill";
 
 type Props = {
   skill: MarketingSkillDoc;
@@ -21,7 +22,7 @@ function copyText(text: string) {
 
 /** Read-only viewer — this microsite has no login/auth layer, so skills ship in code only. */
 export function MarketingSkillModal({ skill, onClose }: Props) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"prompt" | "claude" | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -33,9 +34,15 @@ export function MarketingSkillModal({ skill, onClose }: Props) {
 
   const handleCopy = useCallback(async () => {
     await copyText(skill.systemPrompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied("prompt");
+    setTimeout(() => setCopied(null), 2000);
   }, [skill.systemPrompt]);
+
+  const handleCopyClaude = useCallback(async () => {
+    await copyText(claudeSkillMarkdown(skill));
+    setCopied("claude");
+    setTimeout(() => setCopied(null), 2000);
+  }, [skill]);
 
   return (
     <div
@@ -63,16 +70,7 @@ export function MarketingSkillModal({ skill, onClose }: Props) {
               <p className="mt-1 flex items-center gap-2 text-sm text-zinc-500">
                 <span className="h-2 w-2 rounded-full bg-violet-500" />
                 {skill.categoryLabel}
-                {skill.source === "dust" && (
-                  <a
-                    href={skill.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-violet-600 hover:underline"
-                  >
-                    · Dust SEO agents
-                  </a>
-                )}
+                <span className="text-zinc-400">· Claude skill</span>
               </p>
             </div>
             <button
@@ -123,17 +121,30 @@ export function MarketingSkillModal({ skill, onClose }: Props) {
             <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
               System prompt
             </p>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                copied
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              {copied ? "Copied" : "Copy prompt"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  copied === "prompt"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                }`}
+              >
+                {copied === "prompt" ? "Copied" : "Copy prompt"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyClaude}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  copied === "claude"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                }`}
+              >
+                {copied === "claude" ? "Copied" : "Copy Claude skill"}
+              </button>
+            </div>
           </div>
           <pre className="max-h-64 flex-1 overflow-auto rounded-xl border border-zinc-800 bg-[#282828] p-4 font-mono text-xs leading-6 text-zinc-100 whitespace-pre-wrap">
             {skill.systemPrompt}

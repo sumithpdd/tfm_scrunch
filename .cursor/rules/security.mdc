@@ -40,10 +40,13 @@ admin app:
 - `POST /api/audit/email` — public, rate-limited; sends the PDF to the visitor address they typed.
   Requires `RESEND_API_KEY` and `EMAIL_FROM`.
 - `GET /api/marketing-skills` — public, read-only, serves from code (`marketing-skills-seed.ts`).
+- `POST /api/marketing-skills/email` — public, rate-limited; emails a Claude-ready skill zip
+  for the skill ids the visitor selected. Requires `RESEND_API_KEY` and `EMAIL_FROM`.
 - `/stand-desk` and `/api/admin/leads*` — **not public**. Gated by `LEADS_ADMIN_SECRET` (booth AE)
   or `LEADS_SUPER_ADMIN_SECRET` (stand admin) via an httpOnly cookie. Do not link this from the
   visitor nav. This is not Firebase Auth — it is a booth passcode so visitor PII is not on an
-  open URL. AEs cannot archive, hide, remove, or connect/sync Scrunch.
+  open URL. AEs cannot archive, hide, remove, or connect/sync Scrunch. Super admin can import
+  AE accounts, generate Scrunch brand settings, compare, and entity-sync.
 
 Do not add `requireApiAuth`/Firebase auth back into the kiosk routes without also adding a real
 login flow — a half-wired auth gate would just break the kiosk.

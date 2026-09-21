@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ScrunchBrandCheck, StoredBoothLead, StoredVisibilityReport } from "@/lib/audit-types";
+import type { AeoAuditReport, AeoLead, ScrunchBrandCheck, StoredBoothLead, StoredVisibilityReport } from "@/lib/audit-types";
+import type { ScrunchConnectDiff, ScrunchSyncAction } from "@/lib/scrunch-diff-types";
 import { emptyAuditReport } from "@/lib/audit-types";
 import { BOOTH_EVENTS, DEFAULT_BOOTH_EVENT, type BoothEventCode } from "@/lib/booth-events";
+import { SITE } from "@/lib/site-config";
 import { parseScrunchDashboardUrl, scrunchDashboardUrl } from "@/lib/scrunch-app";
 import type { StandDeskRole } from "@/lib/stand-desk";
 import { GenerationWaitPanel } from "@/components/generation-wait-panel";
 import { MentionRateReportFromSnapshot } from "@/components/mention-rate-report";
 import { VisibilityBriefView } from "@/components/visibility-brief";
+import { ScrunchSetupPanel } from "@/components/scrunch-setup-panel";
 
 type VisitFilter = "all" | "today";
 type ReportFilter = "all" | "scrunch" | "micro" | "none";
@@ -45,6 +48,8 @@ function downloadCsv(leads: StoredBoothLead[]) {
     "Name",
     "Company",
     "Email",
+    "AE",
+    "AE email",
     "Audited brand",
     "Website",
     "Event",
@@ -62,6 +67,8 @@ function downloadCsv(leads: StoredBoothLead[]) {
       csvCell(l.name),
       csvCell(l.company),
       csvCell(l.email),
+      csvCell(l.aeName),
+      csvCell(l.aeEmail),
       csvCell(l.auditedBrand),
       csvCell(l.auditedWebsite),
       csvCell(l.eventCode || "TFM"),
@@ -113,7 +120,9 @@ export function StandDeskView() {
   const [addCompany, setAddCompany] = useState("");
   const [addWebsite, setAddWebsite] = useState("");
   const [addName, setAddName] = useState("");
-  const [addEmail, setAddEmail] = useState("");
+  const [addEmail, setAddEmail] = useState<string>(SITE.defaultVisitorEmail);
+  const [addAeName, setAddAeName] = useState("");
+  const [addAeEmail, setAddAeEmail] = useState("");
   const [addFile, setAddFile] = useState<File | null>(null);
   const [addEventCode, setAddEventCode] = useState<BoothEventCode>(DEFAULT_BOOTH_EVENT);
   const [addOrgId, setAddOrgId] = useState("");
@@ -123,6 +132,15 @@ export function StandDeskView() {
   const [scrunchBrandId, setScrunchBrandId] = useState("");
   const [scrunchCheck, setScrunchCheck] = useState<ScrunchBrandCheck | null>(null);
   const [scrunchBusy, setScrunchBusy] = useState(false);
+  const [editEmail, setEditEmail] = useState("");
+  const [editAeName, setEditAeName] = useState("");
+  const [editAeEmail, setEditAeEmail] = useState("");
+  const [aeFilter, setAeFilter] = useState("all");
+  const [reportFullscreen, setReportFullscreen] = useState(false);
+  const [scrunchDiff, setScrunchDiff] = useState<ScrunchConnectDiff | null>(null);
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [setupNotice, setSetupNotice] = useState<string | null>(null);
+  const [seedBusy, setSeedBusy] = useState(false);
 
   const loadLeads = useCallback(async () => {
     const res = await fetch("/api/admin/leads");
@@ -285,6 +303,8 @@ export function StandDeskView() {
             name: addName,
             email: addEmail,
             eventCode: addEventCode,
+            aeName: addAeName,
+            aeEmail: addAeEmail,
             scrunchOrgId: addOrgId,
             scrunchBrandId: addBrandId,
           }),
@@ -296,12 +316,21 @@ export function StandDeskView() {
       setAddCompany("");
       setAddWebsite("");
       setAddName("");
-      setAddEmail("");
+      setAddEmail(SITE.defaultVisitorEmail);
+      setAddAeName("");
+      setAddAeEmail("");
       setAddFile(null);
       setAddOrgId("");
       setAddBrandId("");
       setEventFilter(addEventCode);
       setAddOpen(false);
+      if (addAeName.trim() || addAeEmail.trim()) {
+        await fetch("/api/admin/leads", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: lead.id, aeName: addAeName, aeEmail: addAeEmail }),
+        });
+      }
       await loadLeads();
       setSelectedId(lead.id);
       setDetailTab(lead.hasScrunchPdf ? "pdf" : "micro");
@@ -449,6 +478,136 @@ export function StandDeskView() {
     }
   }
 
+  async function onSaveAe(lead: StoredBoothLead) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id, aeName: editAeName, aeEmail: editAeEmail }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Could not save AE");
+      await loadLeads();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSeedAccounts() {
+    setSeedBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/leads/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generate: true }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string; results?: { company: string; created: boolean; generated: boolean; error?: string }[] };
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Could not import AE accounts");
+      await loadLeads();
+      const created = data.results?.filter((row) => row.created).length ?? 0;
+      const generated = data.results?.filter((row) => row.generated).length ?? 0;
+      const failed = data.results?.filter((row) => row.error).map((row) => row.company) ?? [];
+      setSetupNotice(
+        `AE accounts: ${created} new, ${generated} with reports.${failed.length ? ` Failed: ${failed.join(", ")}` : ""}`,
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSeedBusy(false);
+    }
+  }
+
+  async function onGenerateSetup(lead: StoredBoothLead) {
+    setSetupBusy(true);
+    setError(null);
+    setSetupNotice(null);
+    try {
+      const res = await fetch("/api/admin/scrunch/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string; warning?: string };
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Could not generate Scrunch settings");
+      await loadLeads();
+      setSetupNotice(data.warning || "Scrunch settings generated.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSetupBusy(false);
+    }
+  }
+
+  async function onConnectSetup(lead: StoredBoothLead) {
+    setSetupBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/scrunch/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string; diff?: ScrunchConnectDiff };
+      if (!res.ok || !data.success || !data.diff) throw new Error(data.error ?? "Could not compare Scrunch");
+      setScrunchDiff(data.diff);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSetupBusy(false);
+    }
+  }
+
+  async function onEntitySync(lead: StoredBoothLead, action: ScrunchSyncAction) {
+    setSetupBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/scrunch/entity-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id, action }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        diff?: ScrunchConnectDiff;
+        notice?: string;
+      };
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Could not sync Scrunch");
+      if (data.diff) setScrunchDiff(data.diff);
+      setSetupNotice(data.notice || "Synced.");
+      await loadLeads();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSetupBusy(false);
+    }
+  }
+
+  async function onSaveEmail(lead: StoredBoothLead) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id, email: editEmail }),
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string; lead?: StoredBoothLead };
+      if (!res.ok || !data.success || !data.lead) throw new Error(data.error ?? "Could not save email");
+      setEditEmail(data.lead.email);
+      await loadLeads();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const isSuper = role === "super";
 
   const eventCounts = useMemo(() => {
@@ -458,6 +617,14 @@ export function StandDeskView() {
       if (code in counts) counts[code] += 1;
     }
     return counts;
+  }, [leads]);
+
+  const aeExecs = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const lead of leads) {
+      if (lead.aeEmail) map.set(lead.aeEmail, lead.aeName || lead.aeEmail);
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [leads]);
 
   const eventLeads = useMemo(
@@ -485,8 +652,9 @@ export function StandDeskView() {
       if (reportFilter === "none" && (l.hasScrunchPdf || l.lastReport)) return false;
       if (isSuper && archiveFilter === "active" && l.archived) return false;
       if (isSuper && archiveFilter === "archived" && !l.archived) return false;
+      if (aeFilter !== "all" && l.aeEmail !== aeFilter) return false;
       if (!q) return true;
-      const hay = [l.name, l.company, l.email, l.auditedBrand, l.auditedWebsite, l.scrunchPdfFilename]
+      const hay = [l.name, l.company, l.email, l.aeName, l.aeEmail, l.auditedBrand, l.auditedWebsite, l.scrunchPdfFilename]
         .join(" ")
         .toLowerCase();
       return hay.includes(q);
@@ -498,7 +666,7 @@ export function StandDeskView() {
       return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
     });
     return rows;
-  }, [leads, query, visitFilter, reportFilter, sortKey, eventFilter, archiveFilter, isSuper]);
+  }, [leads, query, visitFilter, reportFilter, sortKey, eventFilter, archiveFilter, aeFilter, isSuper]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -506,7 +674,7 @@ export function StandDeskView() {
 
   useEffect(() => {
     setPage(0);
-  }, [query, visitFilter, reportFilter, sortKey, eventFilter, archiveFilter]);
+  }, [query, visitFilter, reportFilter, sortKey, eventFilter, archiveFilter, aeFilter]);
 
   const selected = filtered.find((l) => l.id === selectedId) ?? leads.find((l) => l.id === selectedId) ?? null;
   const selectedScrunchHref = scrunchDashboardUrl(scrunchOrgId, scrunchBrandId);
@@ -561,6 +729,29 @@ export function StandDeskView() {
     setScrunchBrandId(selected?.scrunchBrandId || "");
     setScrunchCheck(null);
   }, [selected?.id, selected?.scrunchOrgId, selected?.scrunchBrandId]);
+
+  useEffect(() => {
+    setEditEmail(selected?.email ?? "");
+    setEditAeName(selected?.aeName ?? "");
+    setEditAeEmail(selected?.aeEmail ?? "");
+    setScrunchDiff(null);
+    setSetupNotice(null);
+    if (!selected) setReportFullscreen(false);
+  }, [selected?.id, selected?.email, selected?.aeName, selected?.aeEmail]);
+
+  useEffect(() => {
+    if (!reportFullscreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setReportFullscreen(false);
+    };
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [reportFullscreen]);
 
   if (unlocked === null) {
     return <p className="text-sm text-zinc-500">Checking stand desk…</p>;
@@ -634,6 +825,16 @@ export function StandDeskView() {
             >
               Refresh
             </button>
+            {isSuper ? (
+              <button
+                type="button"
+                disabled={seedBusy}
+                onClick={() => void onSeedAccounts()}
+                className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              >
+                {seedBusy ? "Importing AE accounts…" : "Import AE accounts"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => downloadCsv(filtered)}
@@ -722,6 +923,25 @@ export function StandDeskView() {
               />
             </label>
             <label className="text-sm font-medium text-zinc-700">
+              Account exec
+              <input
+                className={`${inputClass} mt-1`}
+                placeholder="Rajeevan Rai"
+                value={addAeName}
+                onChange={(e) => setAddAeName(e.target.value)}
+              />
+            </label>
+            <label className="text-sm font-medium text-zinc-700">
+              AE email
+              <input
+                type="email"
+                className={`${inputClass} mt-1`}
+                placeholder="rai@sitecore.net"
+                value={addAeEmail}
+                onChange={(e) => setAddAeEmail(e.target.value)}
+              />
+            </label>
+            <label className="text-sm font-medium text-zinc-700">
               Event
               <select
                 className={`${inputClass} mt-1`}
@@ -799,7 +1019,7 @@ export function StandDeskView() {
             Search companies
             <input
               className={`${inputClass} mt-1 text-base`}
-              placeholder="Company, website, name, email…"
+              placeholder="Company, website, name, email, AE…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -816,6 +1036,21 @@ export function StandDeskView() {
               <option value="scrunch">Has Scrunch PDF</option>
               <option value="micro">Micro-audit only</option>
               <option value="none">No report yet</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-zinc-700">
+            Account exec
+            <select
+              className={`${inputClass} mt-1`}
+              value={aeFilter}
+              onChange={(e) => setAeFilter(e.target.value)}
+            >
+              <option value="all">All AEs</option>
+              {aeExecs.map(([email, name]) => (
+                <option key={email} value={email}>
+                  {name}
+                </option>
+              ))}
             </select>
           </label>
           {isSuper ? (
@@ -902,6 +1137,7 @@ export function StandDeskView() {
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-zinc-500">
                     <th className="py-2 pr-3 font-semibold">Company</th>
+                    <th className="py-2 pr-3 font-semibold">AE</th>
                     <th className="py-2 pr-3 font-semibold">Website</th>
                     <th className="py-2 pr-3 font-semibold">Event</th>
                     <th className="py-2 pr-3 font-semibold">Reports</th>
@@ -926,6 +1162,10 @@ export function StandDeskView() {
                         <td className="py-2.5 pr-3">
                           <p className="font-medium text-[#212121]">{lead.company || lead.auditedBrand || "—"}</p>
                           <p className="text-xs text-zinc-500">{lead.name || "No visitor name yet"}</p>
+                        </td>
+                        <td className="py-2.5 pr-3 text-zinc-700">
+                          <p>{lead.aeName || "—"}</p>
+                          {lead.aeEmail ? <p className="text-xs text-zinc-500">{lead.aeEmail}</p> : null}
                         </td>
                         <td className="py-2.5 pr-3 text-zinc-700">{hostLabel(lead.auditedWebsite)}</td>
                         <td className="py-2.5 pr-3">
@@ -995,21 +1235,81 @@ export function StandDeskView() {
                   <p className="mt-1 text-sm text-zinc-600">
                     {hostLabel(selected.auditedWebsite)} · {selected.eventName || selected.eventCode || "TFM"}
                   </p>
-                  {selected.email ? (
-                    <a className="text-sm text-[#6e3fff] underline" href={`mailto:${selected.email}`}>
-                      {selected.email}
-                    </a>
-                  ) : (
-                    <p className="text-sm text-zinc-400">No visitor email yet — add one before sending.</p>
-                  )}
+                  <div className="mt-3 max-w-md">
+                    <label className="text-sm font-medium text-zinc-700">
+                      Visitor email
+                      <span className="ml-1 font-normal text-zinc-400">
+                        {isSuper ? "— used when sending the report" : "— booth AEs can correct this"}
+                      </span>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <input
+                          type="email"
+                          className={`${inputClass} min-w-[14rem] flex-1`}
+                          placeholder="visitor@company.com"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          disabled={busy || editEmail.trim().toLowerCase() === selected.email}
+                          onClick={() => void onSaveEmail(selected)}
+                          className="rounded-[0.625rem] bg-[#6e3fff] px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                        >
+                          Save email
+                        </button>
+                      </div>
+                    </label>
+                    <label className="mt-3 block text-sm font-medium text-zinc-700">
+                      Account exec
+                      <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                        <input
+                          className={inputClass}
+                          placeholder="AE name"
+                          value={editAeName}
+                          onChange={(e) => setEditAeName(e.target.value)}
+                        />
+                        <input
+                          type="email"
+                          className={inputClass}
+                          placeholder="ae@sitecore.net"
+                          value={editAeEmail}
+                          onChange={(e) => setEditAeEmail(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          disabled={
+                            busy ||
+                            (editAeName.trim() === selected.aeName &&
+                              editAeEmail.trim().toLowerCase() === selected.aeEmail)
+                          }
+                          onClick={() => void onSaveAe(selected)}
+                          className="rounded-[0.625rem] border border-zinc-200 px-3 py-2 text-sm font-semibold disabled:opacity-40"
+                        >
+                          Save AE
+                        </button>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(null)}
-                  className="text-sm font-semibold text-zinc-500"
-                >
-                  Close
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReportFullscreen(true)}
+                    className="rounded-[0.625rem] border border-zinc-200 px-3 py-1.5 text-sm font-semibold"
+                  >
+                    Full screen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportFullscreen(false);
+                      setSelectedId(null);
+                    }}
+                    className="text-sm font-semibold text-zinc-500"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
 
               {isSuper ? (
@@ -1143,125 +1443,32 @@ export function StandDeskView() {
                 ) : null}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDetailTab("pdf")}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                    detailTab === "pdf" ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
-                  }`}
-                >
-                  Scrunch PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDetailTab("micro")}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                    detailTab === "micro" ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
-                  }`}
-                >
-                  Micro-audit
-                </button>
-              </div>
-
-              {selected.reportHidden && !isSuper ? (
-                <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                  This report is hidden by the stand admin.
-                </p>
+              {isSuper ? (
+                <ScrunchSetupPanel
+                  lead={selected}
+                  diff={scrunchDiff}
+                  busy={setupBusy}
+                  notice={setupNotice}
+                  onGenerate={() => void onGenerateSetup(selected)}
+                  onConnect={() => void onConnectSetup(selected)}
+                  onSync={(action) => void onEntitySync(selected, action)}
+                />
               ) : null}
 
-              {detailTab === "pdf" ? (
-                <div className="space-y-3">
-                  {selected.hasScrunchPdf ? (
-                    <>
-                      <p className="text-sm text-zinc-600">
-                        {selected.scrunchPdfFilename || "Scrunch report.pdf"}
-                        {selected.scrunchPdfUploadedAt
-                          ? ` · uploaded ${formatWhen(selected.scrunchPdfUploadedAt)}`
-                          : ""}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <a
-                          href={`/api/admin/reports/pdf?website=${encodeURIComponent(selected.auditedWebsite)}&inline=1`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white"
-                        >
-                          Open PDF
-                        </a>
-                        <a
-                          href={`/api/admin/reports/pdf?website=${encodeURIComponent(selected.auditedWebsite)}`}
-                          className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold"
-                        >
-                          Download
-                        </a>
-                      </div>
-                      <iframe
-                        title={`Scrunch PDF for ${selected.company}`}
-                        src={`/api/admin/reports/pdf?website=${encodeURIComponent(selected.auditedWebsite)}&inline=1`}
-                        className="h-[32rem] w-full rounded-xl border border-zinc-200 bg-zinc-50"
-                      />
-                    </>
-                  ) : (
-                    <p className="text-sm text-zinc-500">
-                      No official Scrunch PDF on file for this website yet.
-                    </p>
-                  )}
-                  <label className="block text-sm font-medium text-zinc-700">
-                    {selected.hasScrunchPdf ? "Replace Scrunch PDF" : "Upload Scrunch PDF"}
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="mt-1 block w-full text-sm"
-                      disabled={busy}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void onReplacePdf(selected, file);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {selected.lastReport ? (
-                    <MentionRateReportFromSnapshot
-                      snapshot={selected.lastReport}
-                      rerunning={rerunningId === selected.id}
-                      onRerun={() => void onRerun(selected)}
-                      lead={shareLead ?? undefined}
-                      report={shareReport ?? undefined}
-                    />
-                  ) : (
-                    <div className="space-y-3">
-                      {rerunningId === selected.id ? (
-                        <GenerationWaitPanel active compact />
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-sm text-zinc-600">
-                          No live micro-audit yet for this website.
-                          <button
-                            type="button"
-                            disabled={!selected.auditedWebsite}
-                            onClick={() => void onRerun(selected)}
-                            className="ml-3 rounded-lg bg-[#212121] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                          >
-                            Run micro-audit
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {visibilityReport?.visibility ? (
-                    <VisibilityBriefView
-                      brandName={visibilityReport.brandName || selected.auditedBrand}
-                      website={visibilityReport.website || selected.auditedWebsite}
-                      visibility={visibilityReport.visibility}
-                      lead={{ name: selected.name, company: selected.company, email: selected.email }}
-                      report={shareReport ?? undefined}
-                    />
-                  ) : null}
-                </div>
-              )}
+              <SelectedReportPanels
+                selected={selected}
+                isSuper={isSuper}
+                detailTab={detailTab}
+                setDetailTab={setDetailTab}
+                visibilityReport={visibilityReport}
+                shareLead={shareLead}
+                shareReport={shareReport}
+                rerunningId={rerunningId}
+                onRerun={onRerun}
+                onReplacePdf={onReplacePdf}
+                busy={busy}
+                fullscreen={false}
+              />
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-[#ece4ff] bg-white p-6 text-sm text-zinc-500">
@@ -1271,6 +1478,202 @@ export function StandDeskView() {
           )}
         </section>
       </div>
+
+      {reportFullscreen && selected ? (
+        <div className="fixed inset-0 z-50 flex flex-col bg-[#faf8ff]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ece4ff] bg-white px-5 py-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6e3fff]">Full screen</p>
+              <h2 className="font-serif text-xl font-semibold text-[#212121]">
+                {selected.company || selected.auditedBrand}
+              </h2>
+              <p className="text-sm text-zinc-500">
+                {hostLabel(selected.auditedWebsite)}
+                {selected.email ? ` · ${selected.email}` : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReportFullscreen(false)}
+              className="rounded-[0.625rem] bg-[#212121] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Exit full screen
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
+            <SelectedReportPanels
+              selected={selected}
+              isSuper={isSuper}
+              detailTab={detailTab}
+              setDetailTab={setDetailTab}
+              visibilityReport={visibilityReport}
+              shareLead={shareLead}
+              shareReport={shareReport}
+              rerunningId={rerunningId}
+              onRerun={onRerun}
+              onReplacePdf={onReplacePdf}
+              busy={busy}
+              fullscreen
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SelectedReportPanels({
+  selected,
+  isSuper,
+  detailTab,
+  setDetailTab,
+  visibilityReport,
+  shareLead,
+  shareReport,
+  rerunningId,
+  onRerun,
+  onReplacePdf,
+  busy,
+  fullscreen,
+}: {
+  selected: StoredBoothLead;
+  isSuper: boolean;
+  detailTab: "pdf" | "micro";
+  setDetailTab: (tab: "pdf" | "micro") => void;
+  visibilityReport: StoredVisibilityReport | null;
+  shareLead: AeoLead | null;
+  shareReport: AeoAuditReport | null;
+  rerunningId: string | null;
+  onRerun: (lead: StoredBoothLead) => void;
+  onReplacePdf: (lead: StoredBoothLead, file: File) => void;
+  busy: boolean;
+  fullscreen: boolean;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setDetailTab("pdf")}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+            detailTab === "pdf" ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
+          }`}
+        >
+          Scrunch PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => setDetailTab("micro")}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+            detailTab === "micro" ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
+          }`}
+        >
+          Micro-audit
+        </button>
+      </div>
+
+      {selected.reportHidden && !isSuper ? (
+        <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+          This report is hidden by the stand admin.
+        </p>
+      ) : null}
+
+      {detailTab === "pdf" ? (
+        <div className="space-y-3">
+          {selected.hasScrunchPdf ? (
+            <>
+              <p className="text-sm text-zinc-600">
+                {selected.scrunchPdfFilename || "Scrunch report.pdf"}
+                {selected.scrunchPdfUploadedAt
+                  ? ` · uploaded ${formatWhen(selected.scrunchPdfUploadedAt)}`
+                  : ""}
+              </p>
+              {!fullscreen ? (
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href={`/api/admin/reports/pdf?website=${encodeURIComponent(selected.auditedWebsite)}&inline=1`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Open PDF
+                  </a>
+                  <a
+                    href={`/api/admin/reports/pdf?website=${encodeURIComponent(selected.auditedWebsite)}`}
+                    className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold"
+                  >
+                    Download
+                  </a>
+                </div>
+              ) : null}
+              <iframe
+                title={`Scrunch PDF for ${selected.company}`}
+                src={`/api/admin/reports/pdf?website=${encodeURIComponent(selected.auditedWebsite)}&inline=1`}
+                className={`w-full rounded-xl border border-zinc-200 bg-zinc-50 ${
+                  fullscreen ? "h-[calc(100vh-10rem)]" : "h-[32rem]"
+                }`}
+              />
+            </>
+          ) : (
+            <p className="text-sm text-zinc-500">No official Scrunch PDF on file for this website yet.</p>
+          )}
+          {!fullscreen ? (
+            <label className="block text-sm font-medium text-zinc-700">
+              {selected.hasScrunchPdf ? "Replace Scrunch PDF" : "Upload Scrunch PDF"}
+              <input
+                type="file"
+                accept="application/pdf"
+                className="mt-1 block w-full text-sm"
+                disabled={busy}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void onReplacePdf(selected, file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {selected.lastReport ? (
+            <MentionRateReportFromSnapshot
+              snapshot={selected.lastReport}
+              rerunning={rerunningId === selected.id}
+              onRerun={() => void onRerun(selected)}
+              lead={shareLead ?? undefined}
+              report={shareReport ?? undefined}
+            />
+          ) : (
+            <div className="space-y-3">
+              {rerunningId === selected.id ? (
+                <GenerationWaitPanel active compact />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-sm text-zinc-600">
+                  No live micro-audit yet for this website.
+                  <button
+                    type="button"
+                    disabled={!selected.auditedWebsite}
+                    onClick={() => void onRerun(selected)}
+                    className="ml-3 rounded-lg bg-[#212121] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Run micro-audit
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {visibilityReport?.visibility ? (
+            <VisibilityBriefView
+              brandName={visibilityReport.brandName || selected.auditedBrand}
+              website={visibilityReport.website || selected.auditedWebsite}
+              visibility={visibilityReport.visibility}
+              lead={{ name: selected.name, company: selected.company, email: selected.email }}
+              report={shareReport ?? undefined}
+            />
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

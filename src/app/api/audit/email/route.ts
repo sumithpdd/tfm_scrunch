@@ -3,6 +3,8 @@ import { Resend } from "resend";
 import type { AeoAuditReport, AeoLead } from "@/lib/audit-types";
 import { SITE } from "@/lib/site-config";
 import { pdfInputFromReport, reportPdfBytes, reportPdfFilename } from "@/lib/report-pdf";
+import { findLeadByWebsite, updateLeadEmail } from "@/server/audit/lead-log";
+import { updateReportEmailByWebsite } from "@/server/audit/report-store";
 
 export const maxDuration = 30;
 
@@ -101,6 +103,16 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 502 });
+    }
+
+    if (report.website) {
+      try {
+        const existing = await findLeadByWebsite(report.website);
+        if (existing) await updateLeadEmail(existing.id, to);
+        await updateReportEmailByWebsite(report.website, to);
+      } catch (persistErr) {
+        console.warn("[audit/email] could not persist visitor email", persistErr);
+      }
     }
 
     return NextResponse.json({ success: true });
