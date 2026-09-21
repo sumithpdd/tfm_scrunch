@@ -4,6 +4,7 @@ export type ScrunchLiveBrand = {
   website: string;
   description?: string;
   key_topics?: string[];
+  topics?: string[];
 };
 
 export type ScrunchLivePersona = { id: number; name: string; description: string };

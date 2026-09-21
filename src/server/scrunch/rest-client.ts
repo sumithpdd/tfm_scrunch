@@ -13,6 +13,22 @@ function token(): string | null {
   return process.env.SCRUNCH_API_TOKEN?.trim() || null;
 }
 
+function formatScrunchError(status: number, method: string, path: string, body: string): string {
+  const raw = body.trim();
+  let detail = raw.slice(0, 400);
+  try {
+    const parsed = JSON.parse(raw) as { detail?: unknown; message?: string };
+    if (typeof parsed.detail === "string") detail = parsed.detail;
+    else if (parsed.detail && typeof parsed.detail === "object") {
+      const d = parsed.detail as { message?: string; error?: string };
+      detail = d.message || d.error || JSON.stringify(parsed.detail).slice(0, 400);
+    } else if (parsed.message) detail = parsed.message;
+  } catch {
+    // keep raw text
+  }
+  return `Scrunch API ${status} ${method} ${path}: ${detail}`;
+}
+
 function hostOf(url: string): string {
   try {
     return new URL(url.startsWith("http") ? url : `https://${url}`).hostname
@@ -42,7 +58,7 @@ async function scrunchFetch<T>(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Scrunch API ${res.status} ${method} ${path}: ${body.slice(0, 400)}`);
+    throw new Error(formatScrunchError(res.status, method, path, body));
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
@@ -97,7 +113,7 @@ async function snapshotForBrand(
     promptTotal: prompts.total,
     personaTotal: personas.total,
     competitorTotal: competitors.total,
-    topics: brand.key_topics ?? [],
+    topics: brand.key_topics ?? brand.topics ?? [],
   };
 }
 
@@ -215,19 +231,43 @@ function ensureHttpUrl(raw: string): string | undefined {
   }
 }
 
-export function competitorPayloadFromSheet(c: {
-  name: string;
-  altNames?: string;
-  website?: string;
-}): { name: string; alternative_names: string[]; websites: string[] } {
+function sameHost(a: string, b: string): boolean {
+  return Boolean(a && b && hostOf(a) === hostOf(b));
+}
+
+export function competitorPayloadFromSheet(
+  c: { name: string; altNames?: string; website?: string },
+  opts?: { brandWebsite?: string; liveWebsites?: string[] },
+): { name: string; alternative_names: string[]; websites: string[] } {
   const alternative_names = (c.altNames || "")
     .split(/[,;|]/)
     .map((s) => s.trim())
-    .filter(Boolean);
-  const website = c.website ? ensureHttpUrl(c.website) : undefined;
+    .filter(Boolean)
+    .slice(0, 100);
+  const website = (c.website || "")
+    .split(/[\s,;|]+/)
+    .map((part) => ensureHttpUrl(part))
+    .find(Boolean);
+  const blocked = [opts?.brandWebsite, ...(opts?.liveWebsites ?? [])].filter(Boolean) as string[];
+  const websites = website && !blocked.some((other) => sameHost(website, other)) ? [website] : [];
   return {
     name: c.name.trim(),
     alternative_names,
-    websites: website ? [website] : [],
+    websites,
   };
+}
+
+export async function createScrunchCompetitorWithFallback(
+  brandId: number,
+  competitor: { name: string; alternative_names: string[]; websites: string[] },
+): Promise<ScrunchLiveCompetitor> {
+  try {
+    return await createScrunchCompetitor(brandId, competitor);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (competitor.websites.length && /\b(409|422|already configured|already used)\b/i.test(msg)) {
+      return createScrunchCompetitor(brandId, { ...competitor, websites: [] });
+    }
+    throw err;
+  }
 }

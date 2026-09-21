@@ -6,7 +6,7 @@ import {
   archiveScrunchCompetitor,
   archiveScrunchPersona,
   competitorPayloadFromSheet,
-  createScrunchCompetitor,
+  createScrunchCompetitorWithFallback,
   createScrunchPersona,
   lookupScrunchLive,
   patchScrunchBrand,
@@ -16,6 +16,19 @@ import { saveLeadScrunchSetup } from "@/server/audit/lead-log";
 
 function norm(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function liveCompetitorWebsites(
+  live: { brand?: { website?: string } | null; competitors: { websites?: string[] }[] },
+): string[] {
+  return [
+    live.brand?.website || "",
+    ...live.competitors.flatMap((c) => c.websites || []),
+  ].filter(Boolean);
 }
 
 function recount(doc: ScrunchBrandSetupDoc): ScrunchBrandSetupDoc {
@@ -44,12 +57,18 @@ export async function applyScrunchSync(opts: {
   leadId: string;
   doc: ScrunchBrandSetupDoc;
   action: ScrunchSyncAction;
-}): Promise<{ doc: ScrunchBrandSetupDoc; diff: ScrunchConnectDiff; notice: string }> {
+}): Promise<{
+  doc: ScrunchBrandSetupDoc;
+  diff: ScrunchConnectDiff;
+  notice: string;
+  warnings: string[];
+}> {
   let doc = { ...opts.doc };
   const brandIdRaw = doc.scrunchBrandId?.trim();
   if (!brandIdRaw) throw new Error("Save a Scrunch brand id before syncing.");
   const brandId = Number(brandIdRaw);
   if (!Number.isFinite(brandId)) throw new Error("Scrunch brand id must be a number.");
+  const warnings: string[] = [];
 
   const live = await lookupScrunchLive({
     brandName: doc.brandName,
@@ -135,7 +154,13 @@ export async function applyScrunchSync(opts: {
     case "push_competitor": {
       const competitor = doc.competitors.find((c) => norm(c.name) === norm(action.name));
       if (!competitor) throw new Error(`Competitor “${action.name}” not found on the sheet.`);
-      await createScrunchCompetitor(brandId, competitorPayloadFromSheet(competitor));
+      await createScrunchCompetitorWithFallback(
+        brandId,
+        competitorPayloadFromSheet(competitor, {
+          brandWebsite: live.brand.website,
+          liveWebsites: liveCompetitorWebsites(live),
+        }),
+      );
       notice = `Competitor “${competitor.name}” created in Scrunch.`;
       break;
     }
@@ -176,7 +201,13 @@ export async function applyScrunchSync(opts: {
       const topic = doc.topics.find((t) => norm(t.name) === norm(action.name));
       if (!topic) throw new Error(`Topic “${action.name}” not found on the sheet.`);
       const nextTopics = Array.from(new Set([...(live.topics || []), topic.name]));
-      await patchScrunchBrand(brandId, { key_topics: nextTopics });
+      const patched = await patchScrunchBrand(brandId, { key_topics: nextTopics });
+      const persisted = patched.key_topics ?? patched.topics ?? [];
+      if (!persisted.some((t) => norm(t) === norm(topic.name))) {
+        throw new Error(
+          `Scrunch accepted the topic update but did not keep “${topic.name}”. Returned topics: ${persisted.join(", ") || "none"}.`,
+        );
+      }
       notice = `Topic “${topic.name}” added in Scrunch.`;
       break;
     }
@@ -209,21 +240,44 @@ export async function applyScrunchSync(opts: {
         const missing = doc.personas.filter(
           (p) => !live.personas.some((l) => norm(l.name) === norm(p.name)),
         );
+        let ok = 0;
         for (const persona of missing) {
-          await createScrunchPersona(brandId, {
-            name: persona.name,
-            description: persona.description || persona.name,
-          });
+          try {
+            await createScrunchPersona(brandId, {
+              name: persona.name,
+              description: persona.description || persona.name,
+            });
+            ok += 1;
+          } catch (err: unknown) {
+            warnings.push(`${persona.name}: ${errorText(err)}`);
+          }
         }
-        notice = `Synced ${missing.length} missing persona(s) to Scrunch.`;
+        notice = `Synced ${ok} of ${missing.length} missing persona(s) to Scrunch.`;
+        if (!ok && missing.length) throw new Error(warnings.join(" · ") || "No personas synced.");
       } else if (action.section === "competitors") {
         const missing = doc.competitors.filter(
           (c) => !live.competitors.some((l) => norm(l.name) === norm(c.name)),
         );
+        let ok = 0;
+        const usedWebsites = liveCompetitorWebsites(live);
         for (const competitor of missing) {
-          await createScrunchCompetitor(brandId, competitorPayloadFromSheet(competitor));
+          try {
+            await createScrunchCompetitorWithFallback(
+              brandId,
+              competitorPayloadFromSheet(competitor, {
+                brandWebsite: live.brand.website,
+                liveWebsites: usedWebsites,
+              }),
+            );
+            const createdSite = competitor.website?.trim();
+            if (createdSite) usedWebsites.push(createdSite);
+            ok += 1;
+          } catch (err: unknown) {
+            warnings.push(`${competitor.name}: ${errorText(err)}`);
+          }
         }
-        notice = `Synced ${missing.length} missing competitor(s) to Scrunch.`;
+        notice = `Synced ${ok} of ${missing.length} missing competitor(s) to Scrunch.`;
+        if (!ok && missing.length) throw new Error(warnings.join(" · ") || "No competitors synced.");
       } else {
         const missing = doc.topics.filter(
           (t) => !live.topics.some((l) => norm(l) === norm(t.name)),
@@ -232,9 +286,23 @@ export async function applyScrunchSync(opts: {
           const nextTopics = Array.from(
             new Set([...(live.topics || []), ...missing.map((t) => t.name)]),
           );
-          await patchScrunchBrand(brandId, { key_topics: nextTopics });
+          const patched = await patchScrunchBrand(brandId, { key_topics: nextTopics });
+          const persisted = new Set(
+            (patched.key_topics ?? patched.topics ?? []).map((t) => norm(t)),
+          );
+          const dropped = missing.filter((t) => !persisted.has(norm(t.name)));
+          if (dropped.length) {
+            warnings.push(
+              `Scrunch did not keep: ${dropped.map((t) => t.name).join(", ")}. Returned ${persisted.size} topic(s).`,
+            );
+          }
+          notice = `Synced ${missing.length - dropped.length} of ${missing.length} missing topic(s) to Scrunch.`;
+          if (dropped.length === missing.length) {
+            throw new Error(warnings.join(" · ") || "Scrunch did not persist the topics.");
+          }
+        } else {
+          notice = "No missing topics to sync.";
         }
-        notice = `Synced ${missing.length} missing topic(s) to Scrunch.`;
       }
       break;
     }
@@ -255,5 +323,5 @@ export async function applyScrunchSync(opts: {
     scrunchOrgId: doc.scrunchOrgId,
   });
   const diff = buildScrunchConnectDiff(doc, refreshed);
-  return { doc, diff, notice };
+  return { doc, diff, notice, warnings };
 }

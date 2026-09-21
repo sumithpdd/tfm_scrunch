@@ -99,6 +99,7 @@ export function ScrunchConnectPanel({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-semibold text-[#1e1c22]">{diff.message}</p>
+          {busy ? <p className="mt-1 text-xs text-zinc-500">Syncing with Scrunch…</p> : null}
           {diff.brandId ? (
             <p className="mt-1 text-xs text-zinc-500">
               Comparing sheet ↔ Scrunch brand #{diff.brandId}

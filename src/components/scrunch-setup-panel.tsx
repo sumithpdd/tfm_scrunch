@@ -4,13 +4,14 @@ import type { StoredBoothLead } from "@/lib/audit-types";
 import type { ScrunchConnectDiff, ScrunchSyncAction } from "@/lib/scrunch-diff-types";
 import type { ScrunchBrandSetupDoc } from "@/lib/scrunch-setup-types";
 import { ScrunchConnectPanel } from "@/components/scrunch-connect-panel";
-import { ScrunchWizardPaste } from "@/components/scrunch-wizard-paste";
+import { downloadScrunchPromptCsv } from "@/lib/scrunch-csv";
 
 export function ScrunchSetupPanel({
   lead,
   diff,
   busy,
   notice,
+  error,
   onGenerate,
   onConnect,
   onSync,
@@ -19,6 +20,7 @@ export function ScrunchSetupPanel({
   diff: ScrunchConnectDiff | null;
   busy: boolean;
   notice: string | null;
+  error: string | null;
   onGenerate: () => void;
   onConnect: () => void;
   onSync: (action: ScrunchSyncAction) => void;
@@ -30,8 +32,8 @@ export function ScrunchSetupPanel({
       <div>
         <p className="text-sm font-medium text-[#212121]">Scrunch brand setup</p>
         <p className="mt-1 text-xs leading-5 text-zinc-500">
-          Super admin only. Review the full sheet, then compare and sync description, personas,
-          competitors, and topics into the live Scrunch brand.
+          Super admin only. Generate settings, compare them to the live Scrunch brand, then sync
+          missing description, personas, competitors, and topics.
         </p>
       </div>
 
@@ -80,9 +82,22 @@ export function ScrunchSetupPanel({
         >
           Compare to Scrunch
         </button>
+        <button
+          type="button"
+          disabled={!setup || setup.prompts.length === 0}
+          onClick={() => setup && downloadScrunchPromptCsv(setup)}
+          className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          Download prompt CSV
+        </button>
       </div>
 
       {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
+      {error ? (
+        <p className="whitespace-pre-wrap rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {error}
+        </p>
+      ) : null}
       {diff ? (
         <ScrunchConnectPanel diff={diff} busy={busy} onSync={onSync} onRefresh={onConnect} />
       ) : null}
@@ -119,7 +134,6 @@ function ScrunchSetupDetails({ setup }: { setup: ScrunchBrandSetupDoc }) {
 
       <MarkdownBlock title="§0 Brief" body={setup.briefMarkdown} />
       <MarkdownBlock title="Bias check" body={setup.biasNotes} />
-      <MarkdownBlock title="Wizard handoff" body={setup.wizardHandoff} />
 
       <TableBlock
         title="Personas"
@@ -146,6 +160,17 @@ function ScrunchSetupDetails({ setup }: { setup: ScrunchBrandSetupDoc }) {
           p.stage,
           p.branded ? "yes" : "no",
         ])}
+        action={
+          setup.prompts.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => downloadScrunchPromptCsv(setup)}
+              className="rounded-[0.625rem] border border-zinc-200 px-3 py-1.5 text-xs font-semibold"
+            >
+              Download CSV
+            </button>
+          ) : null
+        }
       />
       <TableBlock
         title="Hypotheses"
@@ -167,8 +192,6 @@ function ScrunchSetupDetails({ setup }: { setup: ScrunchBrandSetupDoc }) {
         headers={["URL", "Ownership"]}
         rows={setup.alternativeWebsites.map((a) => [a.url, a.ownership])}
       />
-
-      <ScrunchWizardPaste doc={setup} />
     </div>
   );
 }
@@ -207,17 +230,22 @@ function TableBlock({
   title,
   headers,
   rows,
+  action,
 }: {
   title: string;
   headers: string[];
   rows: string[][];
+  action?: React.ReactNode;
 }) {
   if (rows.length === 0) return null;
   return (
     <section className="rounded-2xl border border-[#ece8f8] bg-white p-4">
-      <h3 className="font-serif text-lg font-semibold">
-        {title} <span className="text-sm font-normal text-zinc-400">({rows.length})</span>
-      </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-serif text-lg font-semibold">
+          {title} <span className="text-sm font-normal text-zinc-400">({rows.length})</span>
+        </h3>
+        {action}
+      </div>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[520px] text-left text-sm">
           <thead>

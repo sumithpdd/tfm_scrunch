@@ -127,7 +127,8 @@ export function StandDeskView() {
   const [addEventCode, setAddEventCode] = useState<BoothEventCode>(DEFAULT_BOOTH_EVENT);
   const [addOrgId, setAddOrgId] = useState("");
   const [addBrandId, setAddBrandId] = useState("");
-  const [detailTab, setDetailTab] = useState<"pdf" | "micro">("pdf");
+  const [detailTab, setDetailTab] = useState<"scrunch" | "pdf" | "micro">("scrunch");
+  const [setupError, setSetupError] = useState<string | null>(null);
   const [scrunchOrgId, setScrunchOrgId] = useState("");
   const [scrunchBrandId, setScrunchBrandId] = useState("");
   const [scrunchCheck, setScrunchCheck] = useState<ScrunchBrandCheck | null>(null);
@@ -366,6 +367,7 @@ export function StandDeskView() {
   async function onCheckScrunch(lead: StoredBoothLead) {
     setScrunchBusy(true);
     setError(null);
+    setSetupError(null);
     try {
       const res = await fetch("/api/admin/scrunch/check", {
         method: "POST",
@@ -389,7 +391,9 @@ export function StandDeskView() {
       if (data.check.brandId) setScrunchBrandId(data.check.brandId);
       if (data.check.orgId) setScrunchOrgId(data.check.orgId);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setSetupError(msg);
+      setError(msg);
     } finally {
       setScrunchBusy(false);
     }
@@ -398,6 +402,7 @@ export function StandDeskView() {
   async function onSaveScrunch(lead: StoredBoothLead) {
     setScrunchBusy(true);
     setError(null);
+    setSetupError(null);
     try {
       const res = await fetch("/api/admin/leads/scrunch", {
         method: "POST",
@@ -413,7 +418,9 @@ export function StandDeskView() {
       if (!res.ok || !data.success) throw new Error(data.error ?? "Could not save Scrunch ids");
       await loadLeads();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setSetupError(msg);
+      setError(msg);
     } finally {
       setScrunchBusy(false);
     }
@@ -422,6 +429,7 @@ export function StandDeskView() {
   async function onSyncScrunch(lead: StoredBoothLead) {
     setScrunchBusy(true);
     setError(null);
+    setSetupError(null);
     try {
       const res = await fetch("/api/admin/scrunch/sync", {
         method: "POST",
@@ -445,7 +453,9 @@ export function StandDeskView() {
       }
       await loadLeads();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setSetupError(msg);
+      setError(msg);
     } finally {
       setScrunchBusy(false);
     }
@@ -525,6 +535,7 @@ export function StandDeskView() {
   async function onGenerateSetup(lead: StoredBoothLead) {
     setSetupBusy(true);
     setError(null);
+    setSetupError(null);
     setSetupNotice(null);
     try {
       const res = await fetch("/api/admin/scrunch/generate", {
@@ -535,9 +546,34 @@ export function StandDeskView() {
       const data = (await res.json()) as { success?: boolean; error?: string; warning?: string };
       if (!res.ok || !data.success) throw new Error(data.error ?? "Could not generate Scrunch settings");
       await loadLeads();
-      setSetupNotice(data.warning || "Scrunch settings generated.");
+      if (lead.scrunchBrandId || lead.scrunchSetup?.scrunchBrandId) {
+        const compareRes = await fetch("/api/admin/scrunch/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: lead.id }),
+        });
+        const compareData = (await compareRes.json()) as {
+          success?: boolean;
+          error?: string;
+          diff?: ScrunchConnectDiff;
+        };
+        if (!compareRes.ok || !compareData.success || !compareData.diff) {
+          throw new Error(compareData.error ?? "Settings generated, but compare to Scrunch failed.");
+        }
+        setScrunchDiff(compareData.diff);
+        setSetupNotice(
+          data.warning || "Settings generated and compared. Use Sync all missing to push into Scrunch.",
+        );
+      } else {
+        setSetupNotice(
+          data.warning ||
+            "Settings generated. Save the Scrunch brand id, then Compare to Scrunch and sync.",
+        );
+      }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setSetupError(msg);
+      setError(msg);
     } finally {
       setSetupBusy(false);
     }
@@ -546,6 +582,7 @@ export function StandDeskView() {
   async function onConnectSetup(lead: StoredBoothLead) {
     setSetupBusy(true);
     setError(null);
+    setSetupError(null);
     try {
       const res = await fetch("/api/admin/scrunch/connect", {
         method: "POST",
@@ -556,7 +593,9 @@ export function StandDeskView() {
       if (!res.ok || !data.success || !data.diff) throw new Error(data.error ?? "Could not compare Scrunch");
       setScrunchDiff(data.diff);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setSetupError(msg);
+      setError(msg);
     } finally {
       setSetupBusy(false);
     }
@@ -565,6 +604,7 @@ export function StandDeskView() {
   async function onEntitySync(lead: StoredBoothLead, action: ScrunchSyncAction) {
     setSetupBusy(true);
     setError(null);
+    setSetupError(null);
     try {
       const res = await fetch("/api/admin/scrunch/entity-sync", {
         method: "POST",
@@ -580,9 +620,12 @@ export function StandDeskView() {
       if (!res.ok || !data.success) throw new Error(data.error ?? "Could not sync Scrunch");
       if (data.diff) setScrunchDiff(data.diff);
       setSetupNotice(data.notice || "Synced.");
+      if (data.error) setSetupError(data.error);
       await loadLeads();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setSetupError(msg);
+      setError(msg);
     } finally {
       setSetupBusy(false);
     }
@@ -720,9 +763,11 @@ export function StandDeskView() {
 
   useEffect(() => {
     if (!selected) return;
-    if (selected.hasScrunchPdf) setDetailTab("pdf");
+    if (role === "super") setDetailTab("scrunch");
+    else if (selected.hasScrunchPdf) setDetailTab("pdf");
     else if (selected.lastReport) setDetailTab("micro");
-  }, [selected?.id]);
+    else setDetailTab("scrunch");
+  }, [selected?.id, role]);
 
   useEffect(() => {
     setScrunchOrgId(selected?.scrunchOrgId || "");
@@ -736,6 +781,7 @@ export function StandDeskView() {
     setEditAeEmail(selected?.aeEmail ?? "");
     setScrunchDiff(null);
     setSetupNotice(null);
+    setSetupError(null);
     if (!selected) setReportFullscreen(false);
   }, [selected?.id, selected?.email, selected?.aeName, selected?.aeEmail]);
 
@@ -1347,134 +1393,164 @@ export function StandDeskView() {
                 </div>
               ) : null}
 
-              <div className="space-y-3 rounded-2xl border border-[#ece4ff] bg-[#faf8ff] p-4">
-                <div>
-                  <p className="text-sm font-medium text-[#212121]">Scrunch brand</p>
-                  <p className="mt-1 text-xs leading-5 text-zinc-500">
-                    {isSuper
-                      ? "Paste the org id and brand id — or the dashboard URL — then check, save, or sync. Only the stand admin can connect Scrunch."
-                      : selectedScrunchHref
-                        ? "This brand is already in Scrunch. Open the dashboard to review it."
-                        : "Ask the stand admin to connect and validate this brand in Scrunch."}
-                  </p>
-                </div>
-                {isSuper ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-sm font-medium text-zinc-700">
-                      Org id
-                      <input
-                        className={`${inputClass} mt-1`}
-                        placeholder="org id or dashboard URL"
-                        value={scrunchOrgId}
-                        onChange={(e) => {
-                          const parsed = parseScrunchDashboardUrl(e.target.value);
-                          if (parsed) {
-                            setScrunchOrgId(parsed.orgId);
-                            setScrunchBrandId(parsed.brandId);
-                            return;
-                          }
-                          setScrunchOrgId(e.target.value);
-                        }}
-                      />
-                    </label>
-                    <label className="text-sm font-medium text-zinc-700">
-                      Brand id
-                      <input
-                        className={`${inputClass} mt-1`}
-                        placeholder="brand id from /b/…"
-                        value={scrunchBrandId}
-                        onChange={(e) => {
-                          const parsed = parseScrunchDashboardUrl(e.target.value);
-                          if (parsed) {
-                            setScrunchOrgId(parsed.orgId);
-                            setScrunchBrandId(parsed.brandId);
-                            return;
-                          }
-                          setScrunchBrandId(e.target.value);
-                        }}
-                      />
-                    </label>
-                  </div>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  {isSuper ? (
-                    <>
-                      <button
-                        type="button"
-                        disabled={scrunchBusy}
-                        onClick={() => void onCheckScrunch(selected)}
-                        className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                      >
-                        {scrunchBusy ? "Checking…" : "Check in Scrunch"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={scrunchBusy || (!scrunchOrgId.trim() && !scrunchBrandId.trim())}
-                        onClick={() => void onSaveScrunch(selected)}
-                        className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                      >
-                        Save ids
-                      </button>
-                      <button
-                        type="button"
-                        disabled={scrunchBusy}
-                        onClick={() => void onSyncScrunch(selected)}
-                        className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                      >
-                        Sync from Scrunch
-                      </button>
-                    </>
-                  ) : null}
-                  {selectedScrunchHref ? (
-                    <a
-                      href={selectedScrunchHref}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-[0.625rem] bg-[#212121] px-4 py-2 text-sm font-semibold text-white"
-                    >
-                      Open dashboard
-                    </a>
-                  ) : null}
-                </div>
-                {scrunchCheck ? (
-                  <p className={`text-sm ${scrunchCheck.found ? "text-emerald-700" : "text-zinc-600"}`}>
-                    {scrunchCheck.message}
-                    {scrunchCheck.brandName ? ` · ${scrunchCheck.brandName}` : ""}
-                  </p>
-                ) : selected.scrunchBrandId ? (
-                  <p className="text-sm text-zinc-600">
-                    Saved{selected.scrunchBrandName ? `: ${selected.scrunchBrandName}` : ""} (#
-                    {selected.scrunchBrandId})
-                  </p>
-                ) : null}
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["scrunch", "Scrunch"],
+                    ["pdf", "Scrunch PDF"],
+                    ["micro", "Micro-audit"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setDetailTab(id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      detailTab === id ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
-              {isSuper ? (
-                <ScrunchSetupPanel
-                  lead={selected}
-                  diff={scrunchDiff}
-                  busy={setupBusy}
-                  notice={setupNotice}
-                  onGenerate={() => void onGenerateSetup(selected)}
-                  onConnect={() => void onConnectSetup(selected)}
-                  onSync={(action) => void onEntitySync(selected, action)}
-                />
-              ) : null}
+              {detailTab === "scrunch" ? (
+                <div className="space-y-4">
+                  <div className="space-y-3 rounded-2xl border border-[#ece4ff] bg-[#faf8ff] p-4">
+                    <div>
+                      <p className="text-sm font-medium text-[#212121]">Scrunch brand</p>
+                      <p className="mt-1 text-xs leading-5 text-zinc-500">
+                        {isSuper
+                          ? "Save the org id and brand id, generate settings, compare to the live brand, then sync missing entities. Only the stand admin can do this."
+                          : selectedScrunchHref
+                            ? "This brand is already in Scrunch. Open the dashboard to review it."
+                            : "Ask the stand admin to connect and validate this brand in Scrunch."}
+                      </p>
+                    </div>
+                    {isSuper ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="text-sm font-medium text-zinc-700">
+                          Org id
+                          <input
+                            className={`${inputClass} mt-1`}
+                            placeholder="org id or dashboard URL"
+                            value={scrunchOrgId}
+                            onChange={(e) => {
+                              const parsed = parseScrunchDashboardUrl(e.target.value);
+                              if (parsed) {
+                                setScrunchOrgId(parsed.orgId);
+                                setScrunchBrandId(parsed.brandId);
+                                return;
+                              }
+                              setScrunchOrgId(e.target.value);
+                            }}
+                          />
+                        </label>
+                        <label className="text-sm font-medium text-zinc-700">
+                          Brand id
+                          <input
+                            className={`${inputClass} mt-1`}
+                            placeholder="brand id from /b/…"
+                            value={scrunchBrandId}
+                            onChange={(e) => {
+                              const parsed = parseScrunchDashboardUrl(e.target.value);
+                              if (parsed) {
+                                setScrunchOrgId(parsed.orgId);
+                                setScrunchBrandId(parsed.brandId);
+                                return;
+                              }
+                              setScrunchBrandId(e.target.value);
+                            }}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      {isSuper ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={scrunchBusy}
+                            onClick={() => void onCheckScrunch(selected)}
+                            className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                          >
+                            {scrunchBusy ? "Checking…" : "Check in Scrunch"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={scrunchBusy || (!scrunchOrgId.trim() && !scrunchBrandId.trim())}
+                            onClick={() => void onSaveScrunch(selected)}
+                            className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                          >
+                            Save ids
+                          </button>
+                          <button
+                            type="button"
+                            disabled={scrunchBusy}
+                            onClick={() => void onSyncScrunch(selected)}
+                            className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                          >
+                            Sync from Scrunch
+                          </button>
+                        </>
+                      ) : null}
+                      {selectedScrunchHref ? (
+                        <a
+                          href={selectedScrunchHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-[0.625rem] bg-[#212121] px-4 py-2 text-sm font-semibold text-white"
+                        >
+                          Open dashboard
+                        </a>
+                      ) : null}
+                    </div>
+                    {scrunchCheck ? (
+                      <p className={`text-sm ${scrunchCheck.found ? "text-emerald-700" : "text-zinc-600"}`}>
+                        {scrunchCheck.message}
+                        {scrunchCheck.brandName ? ` · ${scrunchCheck.brandName}` : ""}
+                      </p>
+                    ) : selected.scrunchBrandId ? (
+                      <p className="text-sm text-zinc-600">
+                        Saved{selected.scrunchBrandName ? `: ${selected.scrunchBrandName}` : ""} (#
+                        {selected.scrunchBrandId})
+                      </p>
+                    ) : null}
+                    {setupError && !isSuper ? (
+                      <p className="whitespace-pre-wrap rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                        {setupError}
+                      </p>
+                    ) : null}
+                  </div>
 
-              <SelectedReportPanels
-                selected={selected}
-                isSuper={isSuper}
-                detailTab={detailTab}
-                setDetailTab={setDetailTab}
-                visibilityReport={visibilityReport}
-                shareLead={shareLead}
-                shareReport={shareReport}
-                rerunningId={rerunningId}
-                onRerun={onRerun}
-                onReplacePdf={onReplacePdf}
-                busy={busy}
-                fullscreen={reportFullscreen}
-              />
+                  {isSuper ? (
+                    <ScrunchSetupPanel
+                      lead={selected}
+                      diff={scrunchDiff}
+                      busy={setupBusy}
+                      notice={setupNotice}
+                      error={setupError}
+                      onGenerate={() => void onGenerateSetup(selected)}
+                      onConnect={() => void onConnectSetup(selected)}
+                      onSync={(action) => void onEntitySync(selected, action)}
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <SelectedReportPanels
+                  selected={selected}
+                  isSuper={isSuper}
+                  detailTab={detailTab}
+                  visibilityReport={visibilityReport}
+                  shareLead={shareLead}
+                  shareReport={shareReport}
+                  rerunningId={rerunningId}
+                  onRerun={onRerun}
+                  onReplacePdf={onReplacePdf}
+                  busy={busy}
+                  fullscreen={reportFullscreen}
+                />
+              )}
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-[#ece4ff] bg-white p-6 text-sm text-zinc-500">
@@ -1492,7 +1568,6 @@ function SelectedReportPanels({
   selected,
   isSuper,
   detailTab,
-  setDetailTab,
   visibilityReport,
   shareLead,
   shareReport,
@@ -1505,7 +1580,6 @@ function SelectedReportPanels({
   selected: StoredBoothLead;
   isSuper: boolean;
   detailTab: "pdf" | "micro";
-  setDetailTab: (tab: "pdf" | "micro") => void;
   visibilityReport: StoredVisibilityReport | null;
   shareLead: AeoLead | null;
   shareReport: AeoAuditReport | null;
@@ -1517,27 +1591,6 @@ function SelectedReportPanels({
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setDetailTab("pdf")}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            detailTab === "pdf" ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
-          }`}
-        >
-          Scrunch PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => setDetailTab("micro")}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            detailTab === "micro" ? "bg-[#212121] text-white" : "border border-zinc-200 text-zinc-700"
-          }`}
-        >
-          Micro-audit
-        </button>
-      </div>
-
       {selected.reportHidden && !isSuper ? (
         <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
           This report is hidden by the stand admin.

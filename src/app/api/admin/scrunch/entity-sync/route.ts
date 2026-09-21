@@ -34,7 +34,13 @@ export async function POST(request: NextRequest) {
       action: body.action,
     });
     return NextResponse.json(
-      { success: true, setup: result.doc, diff: result.diff, notice: result.notice },
+      {
+        success: true,
+        setup: result.doc,
+        diff: result.diff,
+        notice: result.notice,
+        error: result.warnings.length ? result.warnings.join(" · ") : undefined,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (err: unknown) {
