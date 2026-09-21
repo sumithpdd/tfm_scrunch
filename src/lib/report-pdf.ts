@@ -19,18 +19,32 @@ export type ReportPdfInput = {
   samplePrompts?: string[];
 };
 
+function asText(value: unknown): string {
+  return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
+function pdfSafe(value: string): string {
+  return value
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u2022/g, "-")
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ");
+}
+
 export function pdfInputFromReport(report: AeoAuditReport, lead?: AeoLead): ReportPdfInput {
   return {
-    brandName: report.brandName,
-    website: report.website,
+    brandName: asText(report.brandName),
+    website: asText(report.website),
     lead,
-    citationPrompts: report.citationPrompts,
-    mentionRates: report.mentionRates,
+    citationPrompts: Array.isArray(report.citationPrompts) ? report.citationPrompts : [],
+    mentionRates: Array.isArray(report.mentionRates) ? report.mentionRates : [],
     visibility: report.visibility,
     readiness: report.readiness,
     readinessSummary: report.readinessSummary,
     description: report.description,
-    samplePrompts: report.prompts.slice(0, 10).map((p) => p.prompt),
+    samplePrompts: (report.prompts ?? []).slice(0, 10).map((p) => p.prompt),
   };
 }
 
@@ -47,7 +61,7 @@ export function buildReportPdf(input: ReportPdfInput): jsPDF {
   const ink = (r: number, g: number, b: number) => doc.setTextColor(r, g, b);
   const line = (text: string, size = 11, gap = 6) => {
     doc.setFontSize(size);
-    const lines = doc.splitTextToSize(text, PAGE_W - MARGIN * 2) as string[];
+    const lines = doc.splitTextToSize(pdfSafe(text), PAGE_W - MARGIN * 2) as string[];
     for (const row of lines) {
       if (y > PAGE_H - 18) {
         doc.addPage();
@@ -103,29 +117,29 @@ export function buildReportPdf(input: ReportPdfInput): jsPDF {
   const vis = input.visibility;
   if (vis) {
     y += 3;
-    line(`AI visibility score  ${vis.score.toFixed(1)} / 100`, 14, 8);
+    line(`AI visibility score  ${Number(vis.score ?? 0).toFixed(1)} / 100`, 14, 8);
     line(
-      `Presence ${vis.presencePct.toFixed(1)}%   Position ${vis.positionScore.toFixed(1)}   Citation share ${vis.citationSharePct.toFixed(1)}%   Sentiment ${vis.sentimentScore.toFixed(1)}`,
+      `Presence ${Number(vis.presencePct ?? 0).toFixed(1)}%   Position ${Number(vis.positionScore ?? 0).toFixed(1)}   Citation share ${Number(vis.citationSharePct ?? 0).toFixed(1)}%   Sentiment ${Number(vis.sentimentScore ?? 0).toFixed(1)}`,
       11,
       7,
     );
     if (vis.headline) line(vis.headline, 11, 6);
     y += 2;
     line("Competitor AI presence", 13, 8);
-    for (const row of vis.competitorPresence) {
+    for (const row of vis.competitorPresence ?? []) {
       const you = row.isYou ? "  YOU" : "";
-      const gap = row.isYou ? "" : `   gap ${row.gapPts.toFixed(1)} pts`;
-      line(`${row.name}${you}   ${row.presencePct.toFixed(1)}%${gap}`, 11, 6);
+      const gap = row.isYou ? "" : `   gap ${Number(row.gapPts ?? 0).toFixed(1)} pts`;
+      line(`${row.name}${you}   ${Number(row.presencePct ?? 0).toFixed(1)}%${gap}`, 11, 6);
     }
     y += 2;
     line("Prompts you're losing to competitors", 13, 8);
-    for (const item of vis.lostPrompts) {
+    for (const item of vis.lostPrompts ?? []) {
       line(`"${item.prompt}"`, 11, 6);
     }
     y += 2;
     line("Platform performance", 13, 8);
-    for (const row of vis.platforms) {
-      line(`${row.name}   ${row.presencePct.toFixed(1)}%   ${row.position}   ${row.sentiment}`, 11, 6);
+    for (const row of vis.platforms ?? []) {
+      line(`${row.name}   ${Number(row.presencePct ?? 0).toFixed(1)}%   ${row.position}   ${row.sentiment}`, 11, 6);
     }
   }
 
@@ -150,8 +164,17 @@ export function downloadReportPdf(input: ReportPdfInput) {
   buildReportPdf(input).save(reportPdfFilename(input.brandName));
 }
 
+export function reportPdfBytes(input: ReportPdfInput): Uint8Array {
+  return new Uint8Array(buildReportPdf(input).output("arraybuffer"));
+}
+
 export function reportPdfBase64(input: ReportPdfInput): string {
-  return buildReportPdf(input).output("datauristring").split(",")[1] ?? "";
+  const bytes = reportPdfBytes(input);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
 }
 
 /** @deprecated use downloadReportPdf */

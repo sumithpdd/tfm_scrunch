@@ -1,6 +1,6 @@
-/** Gemini model for CMS chat — override via GEMINI_MODEL in .env.local */
+/** Gemini model for the booth audit — override via GEMINI_MODEL in .env.local */
 export function getGeminiModelId(): string {
-  return process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  return process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
 }
 
 export function formatGeminiError(err: unknown): string {
@@ -9,7 +9,7 @@ export function formatGeminiError(err: unknown): string {
   if (raw.includes("quota") || raw.includes("Quota exceeded") || raw.includes("429")) {
     return (
       "Gemini API quota exceeded for the current model/plan. " +
-      "Try setting GEMINI_MODEL=gemini-2.0-flash-lite or gemini-2.5-flash in .env.local, " +
+      "Try setting GEMINI_MODEL=gemini-3.5-flash-lite or gemini-3.8-flash in .env.local, " +
       "enable billing at https://ai.google.dev/, or wait a minute and retry. " +
       "Usage: https://ai.dev/rate-limit"
     );

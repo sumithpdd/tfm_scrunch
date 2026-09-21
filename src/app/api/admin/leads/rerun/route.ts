@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { snapshotFromReport } from "@/lib/audit-types";
-import { isStandDeskUnlocked } from "@/server/admin/stand-desk-auth";
+import { forbiddenForAEs, getStandDeskRole } from "@/server/admin/stand-desk-auth";
 import { generateAeoAudit } from "@/server/audit/audit.service";
+import { parseBoothEventCode } from "@/lib/booth-events";
 import { getLeadById, logLead } from "@/server/audit/lead-log";
 import { saveVisibilityReport } from "@/server/audit/report-store";
 
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  if (!isStandDeskUnlocked(request)) {
+  const role = getStandDeskRole(request);
+  if (!role) {
     return NextResponse.json({ success: false, error: "Unlock required." }, { status: 401 });
   }
 
@@ -22,6 +24,9 @@ export async function POST(request: NextRequest) {
     const lead = await getLeadById(id);
     if (!lead) {
       return NextResponse.json({ success: false, error: "Lead not found." }, { status: 404 });
+    }
+    if (role !== "super" && (lead.archived || lead.reportHidden)) {
+      return forbiddenForAEs();
     }
 
     const brandName = lead.auditedBrand || lead.company;
@@ -44,6 +49,7 @@ export async function POST(request: NextRequest) {
       brandName,
       website,
       snapshot,
+      parseBoothEventCode(lead.eventCode),
     );
     await saveVisibilityReport({
       lead: { name: lead.name, company: lead.company, email: lead.email },

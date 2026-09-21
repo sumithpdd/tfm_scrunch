@@ -38,11 +38,12 @@ own device. Secondary audience: Sitecore/Scrunch sellers reusing the prompt libr
 | Audit generation service | `src/server/audit/audit.service.ts` |
 | Audit API route | `src/app/api/audit/generate/route.ts` |
 | Lead capture | `src/server/audit/lead-log.ts` (Firestore `tmf_scrunch_leads` + `data/leads.jsonl`) |
-| Visibility reports + PDFs | `src/server/audit/report-store.ts` (Firestore `tmf_scrunch_reports`, one doc per email) |
+| Visibility reports + PDFs | `src/server/audit/report-store.ts` (Firestore `tmf_scrunch_reports`, one doc per website) |
 | Firebase Admin | `src/lib/firebase-admin.ts`, `src/server/db/firestore-admin.ts` |
 | Marketing skills catalog | `src/lib/marketing-skills-seed.ts`, `src/components/marketing-skills-view.tsx` |
 | Marketing skills API | `src/app/api/marketing-skills/route.ts` |
 | Stand desk (hidden leads UI) | `src/app/stand-desk/page.tsx`, `src/components/stand-desk-view.tsx` |
+| Scrunch PDF store | `src/server/audit/pdf-store.ts`, `src/app/api/admin/reports/pdf/route.ts` |
 | Stand desk API | `src/app/api/admin/leads/route.ts`, `src/app/api/admin/leads/session/route.ts` |
 | Report PDF | `src/lib/report-pdf.ts`, `src/components/report-share-actions.tsx` |
 | Email report | `src/app/api/audit/email/route.ts` (Resend; needs `RESEND_API_KEY` + `EMAIL_FROM`) |

@@ -135,7 +135,20 @@ export type AeoLead = {
   email: string;
 };
 
-/** One booth visitor in Firestore `tmf_scrunch_leads` (and the stand-desk UI). */
+export type { BoothEventCode } from "@/lib/booth-events";
+
+/** Result of a stand-desk Scrunch org/brand lookup — ids only, no workflow flags. */
+export type ScrunchBrandCheck = {
+  configured: boolean;
+  found: boolean;
+  orgId: string;
+  brandId: string;
+  brandName: string;
+  website: string;
+  message: string;
+};
+
+/** One booth audit in Firestore `tmf_scrunch_leads` — keyed by website (and the stand-desk UI). */
 export type StoredBoothLead = {
   id: string;
   name: string;
@@ -143,11 +156,20 @@ export type StoredBoothLead = {
   email: string;
   auditedBrand: string;
   auditedWebsite: string;
+  eventCode: string;
   eventName: string;
+  scrunchOrgId: string;
+  scrunchBrandId: string;
+  scrunchBrandName: string;
   createdAt: string;
   updatedAt: string;
   auditCount: number;
   lastReport: MentionRateSnapshot | null;
+  hasScrunchPdf: boolean;
+  scrunchPdfFilename: string;
+  scrunchPdfUploadedAt: string;
+  archived: boolean;
+  reportHidden: boolean;
 };
 
 export type AeoAuditReport = {
@@ -176,6 +198,7 @@ export type GenerateAuditRequest = {
   brandName: string;
   website: string;
   consentAccepted: boolean;
+  eventCode?: string;
 };
 
 export type GenerateAuditResponse =

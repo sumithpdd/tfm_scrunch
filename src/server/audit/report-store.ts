@@ -5,7 +5,7 @@ import { SITE } from "@/lib/site-config";
 import { LEGACY_REPORTS_COLLECTION, REPORTS_COLLECTION, TMF_EVENT_CODE } from "@/lib/tmf-store";
 import { pdfInputFromReport, reportPdfBase64, reportPdfFilename } from "@/lib/report-pdf";
 import { getAdminDb, isServerFirestoreAvailable } from "@/server/db/firestore-admin";
-import { leadDocId } from "@/server/audit/lead-log";
+import { leadDocId, matchHostFromUrl, websiteDocId } from "@/server/audit/lead-log";
 
 export { REPORTS_COLLECTION };
 
@@ -52,7 +52,8 @@ export async function saveVisibilityReport(input: {
   }
 
   const email = input.lead.email.trim().toLowerCase();
-  const ref = getAdminDb().collection(REPORTS_COLLECTION).doc(leadDocId(email));
+  const matchHost = matchHostFromUrl(input.website);
+  const ref = getAdminDb().collection(REPORTS_COLLECTION).doc(websiteDocId(input.website));
   const existing = await ref.get();
   const now = FieldValue.serverTimestamp();
   const pdfFilename = reportPdfFilename(input.report.brandName || input.brandName);
@@ -70,6 +71,7 @@ export async function saveVisibilityReport(input: {
     company: input.lead.company.trim(),
     brandName: input.brandName.trim(),
     website: input.website.trim(),
+    matchHost,
     eventCode: TMF_EVENT_CODE,
     eventName: SITE.eventName,
     visibility: input.report.visibility,
@@ -92,19 +94,38 @@ export async function saveVisibilityReport(input: {
   }
 }
 
+async function readReportDoc(
+  collection: string,
+  id: string,
+  emailFallback: string,
+): Promise<StoredVisibilityReport | null> {
+  if (!id) return null;
+  const snap = await getAdminDb().collection(collection).doc(id).get();
+  if (!snap.exists) return null;
+  return mapReport(snap.id, (snap.data() ?? {}) as Record<string, unknown>, emailFallback);
+}
+
+export async function getVisibilityReportByWebsite(
+  website: string,
+  emailFallback = "",
+): Promise<StoredVisibilityReport | null> {
+  if (!isServerFirestoreAvailable()) {
+    throw new Error("Firestore is not configured");
+  }
+  const id = websiteDocId(website);
+  return (
+    (await readReportDoc(REPORTS_COLLECTION, id, emailFallback)) ??
+    (await readReportDoc(LEGACY_REPORTS_COLLECTION, id, emailFallback))
+  );
+}
+
 export async function getVisibilityReportByEmail(email: string): Promise<StoredVisibilityReport | null> {
   if (!isServerFirestoreAvailable()) {
     throw new Error("Firestore is not configured");
   }
   const id = leadDocId(email);
-  const db = getAdminDb();
-  const primary = await db.collection(REPORTS_COLLECTION).doc(id).get();
-  if (primary.exists) {
-    return mapReport(primary.id, (primary.data() ?? {}) as Record<string, unknown>, email);
-  }
-  const legacy = await db.collection(LEGACY_REPORTS_COLLECTION).doc(id).get();
-  if (legacy.exists) {
-    return mapReport(legacy.id, (legacy.data() ?? {}) as Record<string, unknown>, email);
-  }
-  return null;
+  return (
+    (await readReportDoc(REPORTS_COLLECTION, id, email)) ??
+    (await readReportDoc(LEGACY_REPORTS_COLLECTION, id, email))
+  );
 }

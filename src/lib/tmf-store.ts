@@ -6,6 +6,8 @@ export const TMF_EVENT_CODE = "TMF";
 
 export const LEADS_COLLECTION = "tmf_scrunch_leads";
 export const REPORTS_COLLECTION = "tmf_scrunch_reports";
+export const PDFS_COLLECTION = "tmf_scrunch_pdfs";
+export const PDFS_STORAGE_PREFIX = "tmf_scrunch_pdfs";
 
 /** Previous names — reads still fall back here so older booth docs are not lost. */
 export const LEGACY_LEADS_COLLECTION = "TFM_Scrunch_leads";

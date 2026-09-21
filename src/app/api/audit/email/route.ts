@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import type { AeoAuditReport, AeoLead } from "@/lib/audit-types";
 import { SITE } from "@/lib/site-config";
-import { pdfInputFromReport, reportPdfBase64, reportPdfFilename } from "@/lib/report-pdf";
+import { pdfInputFromReport, reportPdfBytes, reportPdfFilename } from "@/lib/report-pdf";
 
 export const maxDuration = 30;
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const filename = reportPdfFilename(report.brandName);
-    const pdf = reportPdfBase64(pdfInputFromReport(report, lead));
+    const pdf = reportPdfBytes(pdfInputFromReport(report, lead));
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
       from,
@@ -90,7 +90,13 @@ export async function POST(request: NextRequest) {
 <p>Here's your research-based AI visibility brief for <strong>${escapeHtml(report.brandName)}</strong> from the ${escapeHtml(SITE.companyName)} + ${escapeHtml(SITE.productName)} stand at ${escapeHtml(SITE.eventName)}.</p>
 <p>The PDF is attached. This is a light-touch estimate, not a live 30-day Scrunch monitor.</p>
 <p>${escapeHtml(SITE.presenterName)}${SITE.presenterEmail ? `<br/>${escapeHtml(SITE.presenterEmail)}` : ""}</p>`,
-      attachments: [{ filename, content: Buffer.from(pdf, "base64") }],
+      attachments: [
+        {
+          filename,
+          content: Buffer.from(pdf),
+          contentType: "application/pdf",
+        },
+      ],
     });
 
     if (error) {

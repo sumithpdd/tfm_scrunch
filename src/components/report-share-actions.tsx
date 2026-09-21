@@ -36,7 +36,14 @@ export function ReportShareActions({
   const [error, setError] = useState<string | null>(null);
 
   function onDownload() {
-    downloadReportPdf(pdfInputFromReport(report, lead));
+    setError(null);
+    setMessage(null);
+    try {
+      downloadReportPdf(pdfInputFromReport(report, lead));
+      setMessage("PDF downloaded.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not generate the PDF.");
+    }
   }
 
   async function onEmail() {

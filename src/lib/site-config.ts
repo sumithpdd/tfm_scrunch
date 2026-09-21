@@ -4,7 +4,7 @@
  * see AGENTS.md "Before you change code".
  */
 export const SITE = {
-  eventCode: "TMF",
+  eventCode: "TFM",
   eventName: "Technology for Marketing 2026",
   eventUrl: "https://www.technologyformarketing.co.uk/",
   companyName: "Sitecore",

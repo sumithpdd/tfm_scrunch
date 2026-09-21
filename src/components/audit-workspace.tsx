@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AeoAuditReport, AeoLead } from "@/lib/audit-types";
+import { BOOTH_EVENTS, parseBoothEventCode, type BoothEventCode } from "@/lib/booth-events";
 import { SITE } from "@/lib/site-config";
 import { MentionRateReport } from "@/components/mention-rate-report";
 import { DataConsentCheckbox } from "@/components/data-consent-checkbox";
 import { ReportShareActions } from "@/components/report-share-actions";
+import { GenerationWaitPanel, useGenerationWait } from "@/components/generation-wait-panel";
 import { VisibilityBriefView } from "@/components/visibility-brief";
 
 function readinessStyle(rating: AeoAuditReport["readiness"] | undefined) {
@@ -52,11 +54,15 @@ export function AuditWorkspace() {
   });
   const [brandName, setBrandName] = useState(params.get("company") ?? "");
   const [website, setWebsite] = useState(params.get("website") ?? "");
+  const [eventCode, setEventCode] = useState<BoothEventCode>(
+    parseBoothEventCode(params.get("event")),
+  );
   const [consentAccepted, setConsentAccepted] = useState(params.get("consent") === "1");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<AeoAuditReport | null>(null);
   const autoRan = useRef(false);
+  const wait = useGenerationWait(busy);
 
   const runAudit = useCallback(async () => {
     if (!brandName.trim() || !website.trim() || !lead.name.trim() || !lead.email.trim()) {
@@ -77,6 +83,7 @@ export function AuditWorkspace() {
           lead,
           brandName: brandName.trim(),
           website: website.trim(),
+          eventCode,
           consentAccepted: true,
         }),
       });
@@ -88,7 +95,7 @@ export function AuditWorkspace() {
     } finally {
       setBusy(false);
     }
-  }, [brandName, website, lead, consentAccepted]);
+  }, [brandName, website, lead, consentAccepted, eventCode]);
 
   useEffect(() => {
     if (autoRan.current) return;
@@ -121,45 +128,59 @@ export function AuditWorkspace() {
 
       <section className="rounded-2xl border border-[#ece4ff] bg-white p-5">
         <h2 className="font-serif text-xl font-semibold">Brand &amp; website</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-medium">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="text-base font-medium">
             Brand / company name
             <input
-              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal"
+              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
               placeholder="Brand name"
               value={brandName}
               onChange={(e) => setBrandName(e.target.value)}
             />
           </label>
-          <label className="text-sm font-medium">
+          <label className="text-base font-medium">
             Website
             <input
-              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal"
+              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
               placeholder="https://www.example.com/"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
             />
           </label>
-          <label className="text-sm font-medium">
+          <label className="text-base font-medium">
             Your name
             <input
-              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal"
+              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
               value={lead.name}
               onChange={(e) => setLead((l) => ({ ...l, name: e.target.value }))}
             />
           </label>
-          <label className="text-sm font-medium">
+          <label className="text-base font-medium">
             Work email
             <input
               type="email"
-              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 font-normal"
+              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
               value={lead.email}
               onChange={(e) => setLead((l) => ({ ...l, email: e.target.value }))}
             />
+            </label>
+          </div>
+          <label className="mt-4 block text-base font-medium">
+            Event
+            <select
+              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
+              value={eventCode}
+              onChange={(e) => setEventCode(parseBoothEventCode(e.target.value))}
+            >
+              {BOOTH_EVENTS.map((event) => (
+                <option key={event.code} value={event.code}>
+                  {event.label} — {event.name}
+                </option>
+              ))}
+            </select>
           </label>
-        </div>
-        <div className="mt-4">
-          <DataConsentCheckbox
+          <div className="mt-4">
+            <DataConsentCheckbox
             id="audit-data-consent"
             checked={consentAccepted}
             onChange={setConsentAccepted}
@@ -170,9 +191,18 @@ export function AuditWorkspace() {
             type="button"
             disabled={busy || !consentAccepted}
             onClick={() => void runAudit()}
-            className="rounded-[0.625rem] bg-[#212121] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            className="inline-flex min-h-[2.75rem] items-center gap-2 rounded-[0.625rem] bg-[#212121] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {busy ? "Researching…" : report ? "Re-run audit" : "Run my free audit"}
+            {busy ? (
+              <>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                {wait.stage}
+              </>
+            ) : report ? (
+              "Re-run audit"
+            ) : (
+              "Run my free audit"
+            )}
           </button>
           {report ? (
             <>
@@ -188,12 +218,9 @@ export function AuditWorkspace() {
           ) : null}
         </div>
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
-        {busy ? (
-          <p className="mt-3 text-sm text-zinc-500">
-            Reading your homepage and researching how AI assistants would describe you — usually
-            takes 10–20 seconds.
-          </p>
-        ) : null}
+        <div className="mt-4">
+          <GenerationWaitPanel active={busy} wait={wait} />
+        </div>
       </section>
 
       {report ? (

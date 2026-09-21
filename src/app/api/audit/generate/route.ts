@@ -4,6 +4,7 @@ import { logLead } from "@/server/audit/lead-log";
 import { saveVisibilityReport } from "@/server/audit/report-store";
 import type { GenerateAuditRequest } from "@/lib/audit-types";
 import { snapshotFromReport } from "@/lib/audit-types";
+import { parseBoothEventCode } from "@/lib/booth-events";
 import { SITE } from "@/lib/site-config";
 
 export const maxDuration = 60;
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const eventCode = parseBoothEventCode(body.eventCode);
     const { report, error } = await generateAeoAudit({ brandName, website });
 
     await logLead(
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
       brandName,
       website,
       error && report.source === "fallback" ? null : snapshotFromReport(report),
+      eventCode,
     );
 
     if (error && report.source === "fallback") {

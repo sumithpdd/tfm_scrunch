@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { BOOTH_EVENTS, DEFAULT_BOOTH_EVENT, type BoothEventCode } from "@/lib/booth-events";
 import { SITE } from "@/lib/site-config";
 import { DataConsentCheckbox } from "@/components/data-consent-checkbox";
 
@@ -11,6 +12,7 @@ export function LeadCaptureHero() {
   const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
+  const [eventCode, setEventCode] = useState<BoothEventCode>(DEFAULT_BOOTH_EVENT);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +32,7 @@ export function LeadCaptureHero() {
       company: company.trim(),
       email: email.trim(),
       website: website.trim(),
+      event: eventCode,
       consent: "1",
       autorun: "1",
     });
@@ -51,12 +54,12 @@ export function LeadCaptureHero() {
         </h1>
         <p className="mt-5 max-w-md text-sm leading-7 text-zinc-600">{SITE.heroSubcopy}</p>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <form onSubmit={onSubmit} className="mt-8 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Your name" value={name} onChange={setName} placeholder="Jamie Smith" />
             <Field label="Company" value={company} onChange={setCompany} placeholder="Acme Inc" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="Work email"
               type="email"
@@ -71,6 +74,20 @@ export function LeadCaptureHero() {
               placeholder="https://www.acme.com/"
             />
           </div>
+          <label className="block text-base font-medium text-zinc-700">
+            Event
+            <select
+              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal text-zinc-900 outline-none focus:border-[#6e3fff] focus:ring-2 focus:ring-[#6e3fff]/20"
+              value={eventCode}
+              onChange={(e) => setEventCode(e.target.value as BoothEventCode)}
+            >
+              {BOOTH_EVENTS.map((event) => (
+                <option key={event.code} value={event.code}>
+                  {event.label} — {event.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <DataConsentCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
           <button
@@ -101,12 +118,12 @@ function Field({
   type?: string;
 }) {
   return (
-    <label className="block text-sm font-medium text-zinc-700">
+    <label className="block text-base font-medium text-zinc-700">
       {label}
       <input
         type={type}
         required
-        className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm font-normal text-zinc-900 outline-none focus:border-[#6e3fff] focus:ring-2 focus:ring-[#6e3fff]/20"
+        className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal text-zinc-900 outline-none focus:border-[#6e3fff] focus:ring-2 focus:ring-[#6e3fff]/20"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}

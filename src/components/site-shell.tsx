@@ -15,7 +15,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_top,#f5f0ff_0%,#f7f0f5_28%,#f7f7f7_58%,#ffffff_100%)] text-zinc-900">
       <header className="sticky top-0 z-20 border-b border-[#ece4ff] bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-6">
           <Link href="/" className="flex items-center gap-3">
             <div className="rounded-2xl border border-[#ece4ff] bg-white px-3 py-2 shadow-[0_10px_28px_-20px_rgba(134,41,255,0.9)]">
               <Image
@@ -43,7 +43,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:py-10">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:py-10 lg:px-6">
         {children}
       </main>
       <SiteFooter />
@@ -71,7 +71,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 function SiteFooter() {
   return (
     <footer className="border-t border-[#ece4ff] bg-white/70">
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-zinc-600 sm:flex-row sm:items-center sm:justify-between lg:px-6">
         <p>
           Built for the {SITE.companyName} + {SITE.productName} stand at{" "}
           <span className="font-medium text-zinc-800">{SITE.eventName}</span>.

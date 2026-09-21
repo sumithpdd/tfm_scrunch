@@ -21,7 +21,7 @@ Admin to Firestore collection `tmf_scrunch_leads`.
    - asks Gemini to research the brand and produce a Scrunch-style visibility brief (presence,
      position, citation share, sentiment), personas, topics, competitors, and sample prompts,
    - upserts the lead into Firestore `tmf_scrunch_leads` and the visibility brief + PDF into
-     `tmf_scrunch_reports` (one document per visitor email).
+     `tmf_scrunch_reports` (one document per website).
 3. The result renders on `/audit`, with CSV, PDF, and an email draft (attach the downloaded PDF).
 
 This is **research-based, not a live citation check** — the UI and system prompt both say so.

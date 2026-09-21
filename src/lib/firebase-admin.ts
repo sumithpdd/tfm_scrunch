@@ -40,9 +40,12 @@ export function getFirebaseAdminApp(): App {
   }
 
   const serviceAccount = loadServiceAccount();
+  const storageBucket =
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() || `${projectId}.firebasestorage.app`;
   adminApp = initializeApp({
     ...(serviceAccount ? { credential: cert(serviceAccount) } : {}),
     projectId,
+    storageBucket,
   });
   return adminApp;
 }

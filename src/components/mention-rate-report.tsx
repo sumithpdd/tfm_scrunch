@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AeoAuditReport, AeoLead, CitationPrompt, MentionRateRow, MentionRateSnapshot } from "@/lib/audit-types";
 import { SITE } from "@/lib/site-config";
 import { ReportShareActions } from "@/components/report-share-actions";
+import { GenerationWaitPanel } from "@/components/generation-wait-panel";
 
 export function hostnameFromUrl(url: string): string {
   try {
@@ -144,6 +145,7 @@ export function MentionRateReport({
           </p>
 
           <div className="mt-6 flex flex-col gap-3">
+            {rerunning ? <GenerationWaitPanel active compact /> : null}
             {onRerun ? (
               <button
                 type="button"
@@ -151,7 +153,7 @@ export function MentionRateReport({
                 onClick={onRerun}
                 className="w-full rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-[#212121] disabled:opacity-50"
               >
-                {rerunning ? "Rerunning…" : "Rerun report"}
+                {rerunning ? "Still researching…" : "Rerun report"}
               </button>
             ) : null}
             {lead && report ? <ReportShareActions report={report} lead={lead} layout="stack" /> : null}

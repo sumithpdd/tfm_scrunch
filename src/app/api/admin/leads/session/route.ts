@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  isStandDeskUnlocked,
+  getStandDeskRole,
   isUnlockRateLimited,
   lockResponse,
+  matchStandDeskSecret,
   standDeskSecretConfigured,
-  submittedSecretMatches,
   unlockResponse,
 } from "@/server/admin/stand-desk-auth";
 
@@ -13,7 +13,8 @@ function clientIp(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest) {
-  return NextResponse.json({ unlocked: isStandDeskUnlocked(request) });
+  const role = getStandDeskRole(request);
+  return NextResponse.json({ unlocked: Boolean(role), role });
 }
 
 export async function POST(request: NextRequest) {
@@ -37,11 +38,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Passcode required." }, { status: 400 });
   }
 
-  if (!secret || !submittedSecretMatches(secret)) {
+  const role = matchStandDeskSecret(secret);
+  if (!role) {
     return NextResponse.json({ success: false, error: "That passcode doesn't match." }, { status: 401 });
   }
 
-  return unlockResponse();
+  return unlockResponse(role);
 }
 
 export async function DELETE() {
