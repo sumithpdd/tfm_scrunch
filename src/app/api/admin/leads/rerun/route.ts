@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { success: true, report, snapshot },
+      { success: true, report, snapshot, usage: report.usage ?? snapshot.usage ?? null },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (err: unknown) {

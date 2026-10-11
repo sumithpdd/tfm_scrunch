@@ -1,27 +1,27 @@
 /**
- * Central branding config for the TFM Scrunch booth microsite.
- * Keep this the single place that names the event, the presenter, and the CTA copy —
+ * Central branding config for the public AEO/GEO audit.
+ * Keep this the single place that names the product, presenter, and CTA copy —
  * see AGENTS.md "Before you change code".
  */
 export const SITE = {
-  eventCode: "TFM",
-  eventName: "Technology for Marketing 2026",
-  eventUrl: "https://www.technologyformarketing.co.uk/",
+  eventCode: "PUBLIC",
+  eventName: "Public AEO/GEO audit",
+  eventUrl: "https://www.sitecore.com/",
   companyName: "Sitecore",
   productName: "Scrunch",
   presenterName: "Sumith Damodaran",
   presenterEmail: process.env.NEXT_PUBLIC_PRESENTER_EMAIL?.trim() || "",
-  /** Prefill so booth visitors can run an audit without sharing their address. */
-  defaultVisitorEmail: "spd@sitecore.net",
+  /** Empty on the public form — visitors must enter their own work email. */
+  defaultVisitorEmail: "",
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://www.sitecore.com/",
-  ctaLabel: "Get your free AEO/GEO audit",
-  demoCtaLabel: "Book a demo",
+  ctaLabel: "Run my free AEO/GEO audit",
+  demoCtaLabel: "Talk to Sitecore",
   dataRetentionDays: 30,
   consentLabel:
     "I understand my details will be stored for 30 days and will not be used for marketing purposes.",
   tagline: "Free AEO/GEO discoverability audit",
-  heroHeadline: "Unlock the new way to",
-  heroHeadlineEmphasis: "reach customers",
+  heroHeadline: "See how AI talks about",
+  heroHeadlineEmphasis: "your brand",
   heroSubcopy:
-    "Scrunch — now part of Sitecore — is the key into the AI-first customer journey: see how AI assistants describe your brand, who they compare you to, and what buyers are actually asking.",
+    "Enter your name, work email, company, and website. Scrunch — now part of Sitecore — researches how AI assistants would describe you, who they compare you to, and what buyers are asking.",
 } as const;

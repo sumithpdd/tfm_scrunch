@@ -1,4 +1,4 @@
-export const BOOTH_EVENT_CODES = ["TFM", "DMEXCO", "USERGROUP"] as const;
+export const BOOTH_EVENT_CODES = ["PUBLIC", "TFM", "DMEXCO", "USERGROUP"] as const;
 
 export type BoothEventCode = (typeof BOOTH_EVENT_CODES)[number];
 
@@ -7,12 +7,13 @@ export const BOOTH_EVENTS: {
   label: string;
   name: string;
 }[] = [
+  { code: "PUBLIC", label: "Public", name: "Public AEO/GEO audit" },
   { code: "TFM", label: "TFM", name: "Technology for Marketing 2026" },
   { code: "DMEXCO", label: "DMEXCO", name: "DMEXCO" },
   { code: "USERGROUP", label: "Usergroup", name: "Sitecore User Group" },
 ];
 
-export const DEFAULT_BOOTH_EVENT: BoothEventCode = "TFM";
+export const DEFAULT_BOOTH_EVENT: BoothEventCode = "PUBLIC";
 
 export function isBoothEventCode(value: string | undefined | null): value is BoothEventCode {
   return BOOTH_EVENT_CODES.includes((value ?? "") as BoothEventCode);

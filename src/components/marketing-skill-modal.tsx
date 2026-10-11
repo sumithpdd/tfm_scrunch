@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MarketingSkillDoc } from "@/lib/marketing-skills-types";
-import { claudeSkillMarkdown } from "@/lib/claude-skill";
+import {
+  claudeSkillMarkdown,
+  claudeSingleSkillFilename,
+  claudeSingleSkillZip,
+  downloadBytes,
+} from "@/lib/claude-skill";
 
 type Props = {
   skill: MarketingSkillDoc;
@@ -143,6 +148,13 @@ export function MarketingSkillModal({ skill, onClose }: Props) {
                 }`}
               >
                 {copied === "claude" ? "Copied" : "Copy Claude skill"}
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadBytes(claudeSingleSkillZip(skill), claudeSingleSkillFilename(skill))}
+                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-50"
+              >
+                Download for Claude
               </button>
             </div>
           </div>

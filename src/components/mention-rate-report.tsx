@@ -5,6 +5,8 @@ import type { AeoAuditReport, AeoLead, CitationPrompt, MentionRateRow, MentionRa
 import { SITE } from "@/lib/site-config";
 import { ReportShareActions } from "@/components/report-share-actions";
 import { GenerationWaitPanel } from "@/components/generation-wait-panel";
+import { GeminiUsageLine } from "@/components/gemini-usage-line";
+import type { GeminiTokenUsage } from "@/lib/gemini-usage";
 
 export function hostnameFromUrl(url: string): string {
   try {
@@ -55,6 +57,7 @@ type MentionRateReportProps = {
   onRerun?: () => void;
   lead?: AeoLead;
   report?: AeoAuditReport;
+  usage?: GeminiTokenUsage | null;
 };
 
 export function MentionRateReport({
@@ -66,6 +69,7 @@ export function MentionRateReport({
   onRerun,
   lead,
   report,
+  usage,
 }: MentionRateReportProps) {
   const host = hostnameFromUrl(website) || website;
   const ranked = [...mentionRates].sort((a, b) => b.estimatedPct - a.estimatedPct);
@@ -143,6 +147,7 @@ export function MentionRateReport({
             Estimated from public research — not a live {SITE.productName} citation check. Talk to the
             stand for measured mention rate over time.
           </p>
+          <GeminiUsageLine usage={usage ?? report?.usage} label="This run" />
 
           <div className="mt-6 flex flex-col gap-3">
             {rerunning ? <GenerationWaitPanel active compact /> : null}
@@ -196,6 +201,7 @@ export function MentionRateReportFromSnapshot({
       onRerun={onRerun}
       lead={lead}
       report={report}
+      usage={snapshot.usage}
     />
   );
 }

@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AeoAuditReport, AeoLead } from "@/lib/audit-types";
-import { BOOTH_EVENTS, parseBoothEventCode, type BoothEventCode } from "@/lib/booth-events";
+import { AUDIT_STAGE_ORDER, parseExtraUrls, type AuditStageId } from "@/lib/audit-progress";
+import { readAuditGenerateStream } from "@/lib/audit-stream";
+import { emailLooksValid } from "@/lib/email";
 import { SITE } from "@/lib/site-config";
 import { MentionRateReport } from "@/components/mention-rate-report";
 import { DataConsentCheckbox } from "@/components/data-consent-checkbox";
+import { HoneypotField } from "@/components/honeypot-field";
 import { ReportShareActions } from "@/components/report-share-actions";
 import { GenerationWaitPanel, useGenerationWait } from "@/components/generation-wait-panel";
+import { GeminiUsageLine } from "@/components/gemini-usage-line";
+import { TurnstileWidget, isTurnstileEnabled } from "@/components/turnstile-widget";
 import { VisibilityBriefView } from "@/components/visibility-brief";
 
 function readinessStyle(rating: AeoAuditReport["readiness"] | undefined) {
@@ -50,31 +55,46 @@ export function AuditWorkspace() {
   const [lead, setLead] = useState<AeoLead>({
     name: params.get("name") ?? "",
     company: params.get("company") ?? "",
-    email: params.get("email")?.trim() || SITE.defaultVisitorEmail,
+    email: params.get("email")?.trim() ?? "",
   });
   const [brandName, setBrandName] = useState(params.get("company") ?? "");
   const [website, setWebsite] = useState(params.get("website") ?? "");
-  const [eventCode, setEventCode] = useState<BoothEventCode>(
-    parseBoothEventCode(params.get("event")),
-  );
+  const [extraUrls, setExtraUrls] = useState(params.get("extra") ?? "");
+  const [honeypot, setHoneypot] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(params.get("consent") === "1");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<AeoAuditReport | null>(null);
+  const [liveStage, setLiveStage] = useState("");
+  const [liveDetail, setLiveDetail] = useState("");
+  const [reachedStages, setReachedStages] = useState<AuditStageId[]>([]);
   const autoRan = useRef(false);
   const wait = useGenerationWait(busy);
+  const captchaNeeded = isTurnstileEnabled();
 
   const runAudit = useCallback(async () => {
     if (!brandName.trim() || !website.trim() || !lead.name.trim() || !lead.email.trim()) {
-      setError("Fill in your name, email, company, and website first.");
+      setError("Fill in your name, work email, company, and website first.");
+      return;
+    }
+    if (!emailLooksValid(lead.email)) {
+      setError("Enter a valid work email.");
       return;
     }
     if (!consentAccepted) {
       setError(SITE.consentLabel);
       return;
     }
+    if (captchaNeeded && !captchaToken) {
+      setError("Complete the captcha before running the audit.");
+      return;
+    }
     setBusy(true);
     setError(null);
+    setLiveStage("Checking your details");
+    setLiveDetail("");
+    setReachedStages(["validate"]);
     try {
       const res = await fetch("/api/audit/generate", {
         method: "POST",
@@ -83,27 +103,35 @@ export function AuditWorkspace() {
           lead,
           brandName: brandName.trim(),
           website: website.trim(),
-          eventCode,
+          extraUrls: parseExtraUrls(extraUrls),
+          eventCode: SITE.eventCode,
           consentAccepted: true,
+          captchaToken,
+          websiteConfirm: honeypot,
         }),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error ?? "Audit failed");
-      setReport(data.report);
+      const nextReport = await readAuditGenerateStream(res, (event) => {
+        setLiveStage(event.label);
+        setLiveDetail(event.detail ?? "");
+        setReachedStages((current) =>
+          current.includes(event.id) ? current : [...current, event.id],
+        );
+      });
+      setReport(nextReport);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setCaptchaToken("");
     }
-  }, [brandName, website, lead, consentAccepted, eventCode]);
+  }, [brandName, website, extraUrls, lead, consentAccepted, captchaToken, captchaNeeded, honeypot]);
 
   useEffect(() => {
     if (autoRan.current) return;
-    if (params.get("autorun") !== "1") return;
+    if (captchaNeeded) return;
     if (params.get("consent") !== "1") return;
     if (!brandName.trim() || !website.trim() || !lead.name.trim() || !lead.email.trim()) return;
     autoRan.current = true;
-    // Defer to a microtask so this doesn't setState synchronously inside the effect body.
     queueMicrotask(() => void runAudit());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -121,13 +149,13 @@ export function AuditWorkspace() {
           {SITE.companyName} {SITE.productName} researches your site the way an AI assistant would,
           then hypothesises how you show up: who asks about you, what they ask, who else gets named
           alongside you, and how discoverable you look today. This is a light-touch, research-based
-          read — not a live monitoring result. Bring your team to the {SITE.companyName} stand for
-          the full {SITE.productName} version.
+          read — not a live {SITE.productName} monitor.
         </p>
       </section>
 
-      <section className="rounded-2xl border border-[#ece4ff] bg-white p-5">
-        <h2 className="font-serif text-xl font-semibold">Brand &amp; website</h2>
+      <section className="relative rounded-2xl border border-[#ece4ff] bg-white p-5">
+        <HoneypotField value={honeypot} onChange={setHoneypot} />
+        <h2 className="font-serif text-xl font-semibold">Your details</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="text-base font-medium">
             Brand / company name
@@ -139,7 +167,7 @@ export function AuditWorkspace() {
             />
           </label>
           <label className="text-base font-medium">
-            Website
+            Primary website
             <input
               className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
               placeholder="https://www.example.com/"
@@ -160,47 +188,40 @@ export function AuditWorkspace() {
             <input
               type="email"
               className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
+              placeholder="you@company.com"
               value={lead.email}
               onChange={(e) => setLead((l) => ({ ...l, email: e.target.value }))}
             />
-            <p className="mt-1.5 text-xs font-normal leading-5 text-zinc-500">
-              Prefills {SITE.defaultVisitorEmail} so you can run the audit now. Change it here
-              after the report if you want the PDF emailed to you.
-            </p>
           </label>
-          </div>
-          <label className="mt-4 block text-base font-medium">
-            Event
-            <select
-              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
-              value={eventCode}
-              onChange={(e) => setEventCode(parseBoothEventCode(e.target.value))}
-            >
-              {BOOTH_EVENTS.map((event) => (
-                <option key={event.code} value={event.code}>
-                  {event.label} — {event.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="mt-4">
-            <DataConsentCheckbox
+        </div>
+        <label className="mt-4 block text-base font-medium">
+          Extra page URLs <span className="font-normal text-zinc-400">(optional, up to 3)</span>
+          <textarea
+            className="mt-1.5 min-h-[5rem] w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal"
+            placeholder={"https://www.example.com/about\nhttps://www.example.com/pricing"}
+            value={extraUrls}
+            onChange={(e) => setExtraUrls(e.target.value)}
+          />
+        </label>
+        <div className="mt-4">
+          <DataConsentCheckbox
             id="audit-data-consent"
             checked={consentAccepted}
             onChange={setConsentAccepted}
           />
         </div>
+        <TurnstileWidget onToken={setCaptchaToken} />
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            disabled={busy || !consentAccepted}
+            disabled={busy || !consentAccepted || (captchaNeeded && !captchaToken)}
             onClick={() => void runAudit()}
             className="inline-flex min-h-[2.75rem] items-center gap-2 rounded-[0.625rem] bg-[#212121] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {busy ? (
               <>
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                {wait.stage}
+                {liveStage || wait.stage}
               </>
             ) : report ? (
               "Re-run audit"
@@ -222,8 +243,27 @@ export function AuditWorkspace() {
           ) : null}
         </div>
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+        {report?.usage ? (
+          <div className="mt-3">
+            <GeminiUsageLine usage={report.usage} label="This run" />
+          </div>
+        ) : null}
         <div className="mt-4">
-          <GenerationWaitPanel active={busy} wait={wait} />
+          <GenerationWaitPanel
+            active={busy}
+            wait={wait}
+            liveStage={liveStage}
+            liveDetail={liveDetail}
+            steps={AUDIT_STAGE_ORDER.filter((step) => {
+              if (step.id === "done") return false;
+              if (step.id === "read_extra" && parseExtraUrls(extraUrls).length === 0) return false;
+              return true;
+            }).map((step) => ({
+              label: step.label,
+              done: reachedStages.includes(step.id) && liveStage !== step.label,
+              active: liveStage === step.label,
+            }))}
+          />
         </div>
       </section>
 
@@ -340,14 +380,14 @@ function AuditReportView({
         <h2 className="font-serif text-xl font-semibold">Want the real, measured version?</h2>
         <p className="mt-2 max-w-2xl text-sm leading-7 text-white/72">
           This audit is research-based, not a live citation check. {SITE.productName} monitors
-          your actual mention rate across every major AI assistant, tracked over time. Talk to{" "}
-          {SITE.presenterName} at the {SITE.companyName} stand
+          your actual mention rate across every major AI assistant, tracked over time
           {SITE.presenterEmail ? (
             <>
-              , or email{" "}
+              . Email{" "}
               <a className="underline" href={`mailto:${SITE.presenterEmail}`}>
                 {SITE.presenterEmail}
-              </a>
+              </a>{" "}
+              if you want the full picture
             </>
           ) : null}
           .

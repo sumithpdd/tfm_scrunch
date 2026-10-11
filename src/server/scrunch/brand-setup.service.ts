@@ -2,6 +2,7 @@ import "server-only";
 import { generateObject, generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getGeminiModelId, formatGeminiError } from "@/lib/gemini-config";
+import { addGeminiUsage, usageFromAiResult, type GeminiTokenUsage } from "@/lib/gemini-usage";
 import {
   SCRUNCH_PLATFORM_TOKENS,
   type ScrunchBrandSetupDoc,
@@ -194,7 +195,9 @@ Do not invent owned domains or stakeholder emails.`;
     const provider = getProvider();
     const model = provider(getGeminiModelId());
 
+    const modelId = getGeminiModelId();
     let generated: ScrunchSheetGenerated;
+    let usage: GeminiTokenUsage | null = null;
     try {
       const result = await generateObject({
         model,
@@ -203,6 +206,7 @@ Do not invent owned domains or stakeholder emails.`;
         prompt: userPrompt,
       });
       generated = result.object;
+      usage = usageFromAiResult(result, modelId);
     } catch {
       const textResult = await generateText({
         model,
@@ -210,9 +214,15 @@ Do not invent owned domains or stakeholder emails.`;
         prompt: userPrompt,
       });
       generated = scrunchSheetSchema.parse(parseJsonLoose(textResult.text ?? ""));
+      usage = addGeminiUsage(usage, usageFromAiResult(textResult, modelId));
     }
 
-    return { doc: normalizeSheet(generated, { ...input, successMeasures: measures }) };
+    return {
+      doc: {
+        ...normalizeSheet(generated, { ...input, successMeasures: measures }),
+        ...(usage ? { geminiUsage: usage } : {}),
+      },
+    };
   } catch (err: unknown) {
     return {
       doc: {

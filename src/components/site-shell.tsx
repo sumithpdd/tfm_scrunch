@@ -29,7 +29,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#6e3fff]">
-                {SITE.productName} · {SITE.eventName}
+                {SITE.productName} · {SITE.companyName}
               </p>
               <p className="truncate text-sm text-zinc-600">{SITE.tagline}</p>
             </div>
@@ -73,8 +73,8 @@ function SiteFooter() {
     <footer className="border-t border-[#ece4ff] bg-white/70">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-zinc-600 sm:flex-row sm:items-center sm:justify-between lg:px-6">
         <p>
-          Built for the {SITE.companyName} + {SITE.productName} stand at{" "}
-          <span className="font-medium text-zinc-800">{SITE.eventName}</span>.
+          {SITE.companyName} + {SITE.productName} — a free, research-based AEO/GEO audit. Not a live
+          citation monitor.
         </p>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-medium text-zinc-800">{SITE.presenterName}</span>

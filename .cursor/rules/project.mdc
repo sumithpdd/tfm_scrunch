@@ -5,17 +5,18 @@ alwaysApply: true
 
 # TFM Scrunch
 
-Public two-page Next.js App Router microsite for the Sitecore + Scrunch stand at Technology for
-Marketing 2026. No visitor login — the kiosk stays public. Audits are generated live by Gemini;
-booth leads are written server-side to Firestore.
+Public two-page Next.js App Router microsite for a generic Sitecore + Scrunch AEO/GEO audit.
+No visitor login. Audits are generated live by Gemini; leads and request events are written
+server-side to Firestore.
 
 ## Stack
 
 - **Framework**: Next.js (App Router), React 19, Tailwind 4, `next/font/google` (Google Sans)
 - **AI**: Gemini via `ai` + `@ai-sdk/google`, called only from `src/server/audit/` (server-only)
-- **Persistence**: Firestore collections `tmf_scrunch_leads` and `tmf_scrunch_reports` (Firebase
-  Admin, server-only) plus a local `data/leads.jsonl` fallback — see `src/server/audit/lead-log.ts`.
-  No client Firebase SDK. PDFs are stored on the report document (`pdfBase64`).
+- **Persistence**: Firestore collections `tmf_scrunch_leads`, `tmf_scrunch_reports`, and
+  `tmf_scrunch_audit_events` (Firebase Admin, server-only) plus a local `data/leads.jsonl`
+  fallback — see `src/server/audit/lead-log.ts`. No client Firebase SDK. PDFs are stored on
+  the report document (`pdfBase64`).
 
 ## Conventions
 
@@ -37,5 +38,6 @@ booth leads are written server-side to Firestore.
 
 Vercel (or similar): set `GEMINI_API_KEY` (required), `FIREBASE_SERVICE_ACCOUNT_JSON` and
 `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (required to persist leads), `LEADS_ADMIN_SECRET` (stand desk),
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (required in production),
 `GEMINI_MODEL` (optional, defaults to `gemini-3.8-flash`), `NEXT_PUBLIC_SITE_URL` (optional,
-defaults to sitecore.com).
+defaults to sitecore.com). Email sending is disabled.

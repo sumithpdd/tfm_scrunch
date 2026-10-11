@@ -43,7 +43,7 @@ export async function fetchPublicPageText(url: string): Promise<{ text: string; 
       signal: AbortSignal.timeout(12000),
       headers: {
         Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "TFM-Scrunch-Audit/1.0",
+        "User-Agent": "Sitecore-Scrunch-Audit/1.0",
       },
     });
     const finalUrl = res.url || href;

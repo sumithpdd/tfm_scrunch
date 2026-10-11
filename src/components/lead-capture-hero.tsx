@@ -2,24 +2,31 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BOOTH_EVENTS, DEFAULT_BOOTH_EVENT, type BoothEventCode } from "@/lib/booth-events";
 import { SITE } from "@/lib/site-config";
+import { emailLooksValid } from "@/lib/email";
 import { DataConsentCheckbox } from "@/components/data-consent-checkbox";
+import { HoneypotField } from "@/components/honeypot-field";
 
 export function LeadCaptureHero() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
-  const [email, setEmail] = useState<string>(SITE.defaultVisitorEmail);
+  const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
-  const [eventCode, setEventCode] = useState<BoothEventCode>(DEFAULT_BOOTH_EVENT);
+  const [extraUrls, setExtraUrls] = useState("");
+  const [honeypot, setHoneypot] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (honeypot.trim()) return;
     if (!name.trim() || !company.trim() || !email.trim() || !website.trim()) {
-      setError("Fill in all four fields to run your free audit.");
+      setError("Fill in your name, work email, company, and website.");
+      return;
+    }
+    if (!emailLooksValid(email)) {
+      setError("Enter a valid work email.");
       return;
     }
     if (!consentAccepted) {
@@ -32,9 +39,8 @@ export function LeadCaptureHero() {
       company: company.trim(),
       email: email.trim(),
       website: website.trim(),
-      event: eventCode,
+      extra: extraUrls.trim(),
       consent: "1",
-      autorun: "1",
     });
     router.push(`/audit?${params.toString()}`);
   }
@@ -54,7 +60,8 @@ export function LeadCaptureHero() {
         </h1>
         <p className="mt-5 max-w-md text-sm leading-7 text-zinc-600">{SITE.heroSubcopy}</p>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <form onSubmit={onSubmit} className="relative mt-8 space-y-4">
+          <HoneypotField value={honeypot} onChange={setHoneypot} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Your name" value={name} onChange={setName} placeholder="Jamie Smith" />
             <Field label="Company" value={company} onChange={setCompany} placeholder="Acme Inc" />
@@ -65,8 +72,7 @@ export function LeadCaptureHero() {
               type="email"
               value={email}
               onChange={setEmail}
-              placeholder={SITE.defaultVisitorEmail}
-              hint="Leave this if you prefer not to share yours. Change it after the audit if you want the PDF emailed to you."
+              placeholder="you@company.com"
             />
             <Field
               label="Website URL"
@@ -76,18 +82,16 @@ export function LeadCaptureHero() {
             />
           </div>
           <label className="block text-base font-medium text-zinc-700">
-            Event
-            <select
-              className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal text-zinc-900 outline-none focus:border-[#6e3fff] focus:ring-2 focus:ring-[#6e3fff]/20"
-              value={eventCode}
-              onChange={(e) => setEventCode(e.target.value as BoothEventCode)}
-            >
-              {BOOTH_EVENTS.map((event) => (
-                <option key={event.code} value={event.code}>
-                  {event.label} — {event.name}
-                </option>
-              ))}
-            </select>
+            Extra pages <span className="font-normal text-zinc-400">(optional, up to 3)</span>
+            <textarea
+              className="mt-1.5 min-h-[5.5rem] w-full rounded-xl border border-zinc-200 px-4 py-3 text-base font-normal text-zinc-900 outline-none focus:border-[#6e3fff] focus:ring-2 focus:ring-[#6e3fff]/20"
+              placeholder={"https://www.acme.com/about\nhttps://www.acme.com/pricing"}
+              value={extraUrls}
+              onChange={(e) => setExtraUrls(e.target.value)}
+            />
+            <p className="mt-1.5 text-xs font-normal leading-5 text-zinc-500">
+              Product, about, or docs pages help the audit. One URL per line.
+            </p>
           </label>
           <DataConsentCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
@@ -111,14 +115,12 @@ function Field({
   onChange,
   placeholder,
   type = "text",
-  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   type?: string;
-  hint?: string;
 }) {
   return (
     <label className="block text-base font-medium text-zinc-700">
@@ -131,7 +133,6 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
-      {hint ? <p className="mt-1.5 text-xs font-normal leading-5 text-zinc-500">{hint}</p> : null}
     </label>
   );
 }

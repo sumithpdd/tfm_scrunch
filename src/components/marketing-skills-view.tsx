@@ -76,8 +76,9 @@ export function MarketingSkillsView() {
           AI Marketing Skills
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-600">
-          A working prompt library for Claude — pick the skills you want, download a ready-to-add
-          pack, or email the zip. Each skill includes the trigger, tools, and system prompt.
+          A working prompt library for Claude. Pick the skills you want and download a zip of
+          standard skill folders — each has a SKILL.md you can upload in Claude.ai or drop into
+          Claude Code.
         </p>
         <p className="mt-2 text-sm font-medium text-zinc-500">
           {loading ? "Loading…" : `${skills.length} marketing skills`}

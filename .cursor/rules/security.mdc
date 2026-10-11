@@ -10,10 +10,11 @@ alwaysApply: true
 - **Never** commit `.env.local`, `GEMINI_API_KEY`, or a real `SCRUNCH_API_TOKEN`.
 - **Never** put real API keys or Scrunch org/brand ids in README, docs, UI placeholders, or
   `.env.example` (generic placeholders only).
-- Booth visitor names and emails live in Firestore `tmf_scrunch_leads`, visibility briefs
+- Visitor names and emails live in Firestore `tmf_scrunch_leads`, visibility briefs
   in `tmf_scrunch_reports` (one doc per website), official Scrunch PDFs in Storage/Firestore
-  `tmf_scrunch_pdfs`, and the gitignored `data/leads.jsonl` fallback. Do not
-  commit PII, and do not add analytics that ships it anywhere else without asking.
+  `tmf_scrunch_pdfs`, request logs in `tmf_scrunch_audit_events` (hashed IP), and the
+  gitignored `data/leads.jsonl` fallback. Do not commit PII, and do not add analytics
+  that ships it anywhere else without asking.
 - Do not add a client Firestore SDK or security rules that let the browser read `tmf_scrunch_leads`
   or `tmf_scrunch_reports`. Writes go through Firebase Admin only.
 
@@ -26,22 +27,23 @@ alwaysApply: true
 | `GOOGLE_APPLICATION_CREDENTIALS` | Local alternative path to the service-account JSON file |
 | `LEADS_ADMIN_SECRET` | Booth AE passcode for `/stand-desk` (view, add, run audits) |
 | `LEADS_SUPER_ADMIN_SECRET` | Stand admin passcode — archive, hide, remove, Scrunch connect/sync |
-| `RESEND_API_KEY` | Sends the audit PDF to the visitor ("Send me an email") |
-| `EMAIL_FROM` | Verified From address for Resend |
+| `RESEND_API_KEY` | Email sending is disabled — reserved for a future verified sender |
+| `EMAIL_FROM` | Email sending is disabled — reserved for a future verified sender |
+| `TURNSTILE_SECRET_KEY` | Server verify for Cloudflare Turnstile on `/api/audit/generate` |
 | `SCRUNCH_API_TOKEN` | Not used in v1 — reserved for a future live Scrunch check |
 
 ## Public API routes
 
-This project is intentionally **auth-free** — it is a public booth kiosk tool, not an internal
-admin app:
+This project is intentionally **auth-free** for visitors — a public audit tool, not an internal
+admin app. Public generate must stay bot-resistant:
 
-- `POST /api/audit/generate` — public, but rate-limited per IP in-process (see the route file);
-  keep that guard if you change this route, since it calls a paid Gemini API.
-- `POST /api/audit/email` — public, rate-limited; sends the PDF to the visitor address they typed.
-  Requires `RESEND_API_KEY` and `EMAIL_FROM`.
+- `POST /api/audit/generate` — public. Requires consent, a real email, honeypot empty, Turnstile
+  when `TURNSTILE_SECRET_KEY` is set, and in-process rate limits (IP + email). Logs every
+  attempt to `tmf_scrunch_audit_events`. Keep those guards — this route calls a paid Gemini API.
+- `POST /api/audit/email` and `POST /api/marketing-skills/email` — disabled (503) until a
+  verified sender exists.
 - `GET /api/marketing-skills` — public, read-only, serves from code (`marketing-skills-seed.ts`).
-- `POST /api/marketing-skills/email` — public, rate-limited; emails a Claude-ready skill zip
-  for the skill ids the visitor selected. Requires `RESEND_API_KEY` and `EMAIL_FROM`.
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — public site key for the captcha widget.
 - `/stand-desk` and `/api/admin/leads*` — **not public**. Gated by `LEADS_ADMIN_SECRET` (booth AE)
   or `LEADS_SUPER_ADMIN_SECRET` (stand admin) via an httpOnly cookie. Do not link this from the
   visitor nav. This is not Firebase Auth — it is a booth passcode so visitor PII is not on an

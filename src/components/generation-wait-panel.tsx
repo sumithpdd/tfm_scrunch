@@ -41,14 +41,21 @@ export function GenerationWaitPanel({
   active,
   compact = false,
   wait,
+  liveStage,
+  liveDetail,
+  steps,
 }: {
   active: boolean;
   compact?: boolean;
   wait?: ReturnType<typeof useGenerationWait>;
+  liveStage?: string;
+  liveDetail?: string;
+  steps?: { label: string; done: boolean; active: boolean }[];
 }) {
   const local = useGenerationWait(active && !wait);
   const { fact, stage, factIndex, stageIndex } = wait ?? local;
   if (!active) return null;
+  const headline = liveStage || stage;
 
   return (
     <div
@@ -65,17 +72,41 @@ export function GenerationWaitPanel({
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6e3fff]">
             {SITE.companyName} {SITE.productName} is on it
           </p>
-          <p className="mt-1 text-sm font-semibold text-[#212121]">{stage}</p>
-          <div className="mt-2 flex gap-1.5">
-            {GENERATION_STAGES.map((_, i) => (
-              <span
-                key={GENERATION_STAGES[i]}
-                className={`h-1.5 flex-1 rounded-full ${
-                  i <= stageIndex ? "bg-[#6e3fff]" : "bg-zinc-200"
-                }`}
-              />
-            ))}
-          </div>
+          <p className="mt-1 text-sm font-semibold text-[#212121]">{headline}</p>
+          {liveDetail ? <p className="mt-1 truncate text-xs text-zinc-500">{liveDetail}</p> : null}
+          {steps?.length ? (
+            <ol className="mt-3 space-y-1.5">
+              {steps.map((step) => (
+                <li key={step.label} className="flex items-center gap-2 text-xs">
+                  <span
+                    className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                      step.done
+                        ? "bg-emerald-500 text-white"
+                        : step.active
+                          ? "bg-[#6e3fff] text-white"
+                          : "bg-zinc-200 text-zinc-500"
+                    }`}
+                  >
+                    {step.done ? "✓" : step.active ? "…" : ""}
+                  </span>
+                  <span className={step.active ? "font-semibold text-[#212121]" : "text-zinc-500"}>
+                    {step.label}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="mt-2 flex gap-1.5">
+              {GENERATION_STAGES.map((_, i) => (
+                <span
+                  key={GENERATION_STAGES[i]}
+                  className={`h-1.5 flex-1 rounded-full ${
+                    i <= stageIndex ? "bg-[#6e3fff]" : "bg-zinc-200"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

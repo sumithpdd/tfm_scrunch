@@ -1,5 +1,7 @@
 /** Scrunch brand-setup build sheet — stored in Firestore `scrunch_brands/{setupId}`. */
 
+import type { GeminiTokenUsage } from "@/lib/gemini-usage";
+
 export type ScrunchBrandRelationship = "customer" | "prospect";
 
 /** Sheet lifecycle — skill ends at BUILT after human wizard + CSV. */
@@ -96,6 +98,7 @@ export type ScrunchBrandSetupDoc = {
   createdByEmail: string;
   source: "gemini" | "intake";
   skillSourceUrl: string;
+  geminiUsage?: GeminiTokenUsage;
   updatedAt?: unknown;
 };
 

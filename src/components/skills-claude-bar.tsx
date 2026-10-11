@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { MarketingSkillDoc } from "@/lib/marketing-skills-types";
 import { claudeSkillsZip, claudeSkillsZipFilename } from "@/lib/claude-skill";
-import { SITE } from "@/lib/site-config";
 
 function downloadClaudeSkillsZip(skills: MarketingSkillDoc[]) {
   const bytes = claudeSkillsZip(skills);
@@ -20,21 +19,6 @@ function downloadClaudeSkillsZip(skills: MarketingSkillDoc[]) {
   URL.revokeObjectURL(url);
 }
 
-function skillsMailto(name: string, email: string, skills: MarketingSkillDoc[]): string {
-  const subject = `Your ${SITE.productName} Claude marketing skills`;
-  const body = `Hi ${name},
-
-Here are the ${skills.length} AI marketing skills you picked at the ${SITE.companyName} + ${SITE.productName} stand. Attach the downloaded zip, then add the folders to Claude.
-
-Claude.ai: Settings → Capabilities → Skills → upload each folder.
-Claude Code: copy each folder to ~/.claude/skills/
-
-${skills.map((skill) => `- ${skill.name.replace(/_/g, " ")}`).join("\n")}
-
-${SITE.presenterName}${SITE.presenterEmail ? `\n${SITE.presenterEmail}` : ""}`;
-  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
 export function SkillsClaudeBar({
   selected,
   onClear,
@@ -44,64 +28,16 @@ export function SkillsClaudeBar({
   onClear: () => void;
   onSelectAll: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState<string>(SITE.defaultVisitorEmail);
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [showInstall, setShowInstall] = useState(false);
 
   function onDownload() {
-    setError(null);
-    setMessage(null);
     if (selected.length === 0) return;
     downloadClaudeSkillsZip(selected);
-    setMessage("Claude skill pack downloaded.");
-  }
-
-  async function onEmail(e: React.FormEvent) {
-    e.preventDefault();
-    if (selected.length === 0) return;
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/marketing-skills/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          skillIds: selected.map((skill) => skill.skillId),
-        }),
-      });
-      const data = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || !data.success) {
-        if (res.status === 503) {
-          downloadClaudeSkillsZip(selected);
-          const draft = document.createElement("a");
-          draft.href = skillsMailto(name.trim() || "there", email.trim(), selected);
-          draft.rel = "noreferrer";
-          document.body.appendChild(draft);
-          draft.click();
-          draft.remove();
-          setError(
-            "Email sending isn't configured on this machine yet — the Claude pack was downloaded and your mail app should open so you can attach it.",
-          );
-          return;
-        }
-        throw new Error(data.error ?? "Could not send skills");
-      }
-      setMessage(`Sent ${selected.length} Claude skill${selected.length === 1 ? "" : "s"} to ${email.trim()}`);
-      setOpen(false);
-    } catch (err: unknown) {
-      downloadClaudeSkillsZip(selected);
-      setError(
-        `${err instanceof Error ? err.message : String(err)} The Claude pack was downloaded so you can attach it yourself.`,
-      );
-    } finally {
-      setBusy(false);
-    }
+    setShowInstall(true);
+    setMessage(
+      `Downloaded ${selected.length} skill${selected.length === 1 ? "" : "s"}. Unzip, then add each folder to Claude.`,
+    );
   }
 
   if (selected.length === 0) return null;
@@ -114,7 +50,7 @@ export function SkillsClaudeBar({
             {selected.length} skill{selected.length === 1 ? "" : "s"} selected for Claude
           </p>
           <p className="text-xs text-zinc-500">
-            Download a ready-to-add skill pack, or email the zip.
+            Download a zip of standard Claude skill folders — each has a SKILL.md ready to upload.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -135,47 +71,30 @@ export function SkillsClaudeBar({
           <button
             type="button"
             onClick={onDownload}
-            className="rounded-[0.625rem] border border-zinc-200 px-3 py-2 text-xs font-semibold"
+            className="rounded-[0.625rem] bg-[#212121] px-3 py-2 text-xs font-semibold text-white"
           >
             Download for Claude
           </button>
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            className="rounded-[0.625rem] bg-[#212121] px-3 py-2 text-xs font-semibold text-white"
-          >
-            Email skills
-          </button>
+          {/* Email sending is disabled.
+          <button type="button">Email skills</button>
+          */}
         </div>
       </div>
-      {open ? (
-        <form onSubmit={(e) => void onEmail(e)} className="mx-auto mt-3 grid max-w-6xl gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <input
-            required
-            className="rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-            placeholder="Your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            required
-            type="email"
-            className="rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-            placeholder={SITE.defaultVisitorEmail}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-[0.625rem] bg-[#6e3fff] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {busy ? "Sending…" : "Send pack"}
-          </button>
-        </form>
-      ) : null}
       {message ? <p className="mx-auto mt-2 max-w-6xl text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="mx-auto mt-2 max-w-6xl text-sm text-red-700">{error}</p> : null}
+      {showInstall ? (
+        <ol className="mx-auto mt-2 max-w-6xl list-decimal space-y-1 pl-5 text-xs leading-5 text-zinc-600">
+          <li>Unzip the pack. Each folder is one skill.</li>
+          <li>
+            <strong>Claude.ai:</strong> Settings → Capabilities → Skills → Upload skill → choose a
+            folder (or zip that folder).
+          </li>
+          <li>
+            <strong>Claude Code:</strong> copy each folder into <code>~/.claude/skills/</code>{" "}
+            (Windows: <code>%USERPROFILE%\.claude\skills\</code>), then start a new session.
+          </li>
+          <li>Ask Claude to use the skill by name.</li>
+        </ol>
+      ) : null}
     </div>
   );
 }

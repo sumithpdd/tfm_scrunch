@@ -5,6 +5,7 @@ import type { ScrunchConnectDiff, ScrunchSyncAction } from "@/lib/scrunch-diff-t
 import type { ScrunchBrandSetupDoc } from "@/lib/scrunch-setup-types";
 import { ScrunchConnectPanel } from "@/components/scrunch-connect-panel";
 import { downloadScrunchPromptCsv } from "@/lib/scrunch-csv";
+import { GeminiUsageLine } from "@/components/gemini-usage-line";
 
 export function ScrunchSetupPanel({
   lead,
@@ -57,10 +58,13 @@ export function ScrunchSetupPanel({
       </dl>
 
       {setup ? (
-        <p className="text-sm text-zinc-600">
-          {setup.counts.personas} personas · {setup.counts.topics} topics · {setup.counts.competitors}{" "}
-          competitors · {setup.counts.seeds} prompts
-        </p>
+        <div className="space-y-1">
+          <p className="text-sm text-zinc-600">
+            {setup.counts.personas} personas · {setup.counts.topics} topics · {setup.counts.competitors}{" "}
+            competitors · {setup.counts.seeds} prompts
+          </p>
+          <GeminiUsageLine usage={setup.geminiUsage} label="Last generate" />
+        </div>
       ) : (
         <p className="text-sm text-zinc-500">No Scrunch build sheet yet for this company.</p>
       )}

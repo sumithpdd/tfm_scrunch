@@ -1,10 +1,13 @@
 import { SITE } from "@/lib/site-config";
 
 export const GENERATION_STAGES = [
+  "Checking your details…",
   "Reading your homepage…",
-  "Asking how AI assistants would describe you…",
-  "Checking who else gets named beside you…",
+  "Reading extra pages you added…",
+  "Researching how AI would describe you…",
+  "Comparing you with brands AI names nearby…",
   "Writing your visibility brief…",
+  "Saving your audit…",
 ] as const;
 
 export const GENERATION_FACTS: { kicker: string; body: string }[] = [
@@ -41,7 +44,7 @@ export const GENERATION_FACTS: { kicker: string; body: string }[] = [
     body: `A lot of brand truth lives in ${SITE.companyName} DAM or Content Hub — not on the public web. ${SITE.productName} Knowledge Studio turns those approved docs into a living source for AI tools.`,
   },
   {
-    kicker: "This booth brief is the teaser",
+    kicker: "This brief is the teaser",
     body: `What you're waiting on is a research snapshot. The live ${SITE.productName} report watches hundreds of prompts over 7, 30, or 90 days — mention rate, citations, sentiment, the lot.`,
   },
   {

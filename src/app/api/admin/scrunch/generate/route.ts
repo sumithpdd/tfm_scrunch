@@ -52,7 +52,13 @@ export async function POST(request: NextRequest) {
       scrunchBrandId: lead.scrunchBrandId || doc.scrunchBrandId || "",
     });
     return NextResponse.json(
-      { success: true, setup: saved.scrunchSetup, lead: saved, warning: error },
+      {
+        success: true,
+        setup: saved.scrunchSetup,
+        lead: saved,
+        warning: error,
+        usage: saved.scrunchSetup?.geminiUsage ?? null,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (err: unknown) {

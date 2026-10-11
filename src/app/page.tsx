@@ -52,8 +52,8 @@ export default function Home() {
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-white/72">
           {SITE.productName} gets your site AI-ready so you show up in answers, get cited, and grow
-          revenue. Now part of {SITE.companyName}. Want the full picture, not just the light-touch
-          version? Come find {SITE.presenterName} at the stand.
+          revenue. Now part of {SITE.companyName}. This free audit is a research snapshot — the full
+          product measures mention rate across assistants over time.
         </p>
       </section>
     </div>

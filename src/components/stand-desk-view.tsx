@@ -5,6 +5,7 @@ import type { AeoAuditReport, AeoLead, ScrunchBrandCheck, StoredBoothLead, Store
 import type { ScrunchConnectDiff, ScrunchSyncAction } from "@/lib/scrunch-diff-types";
 import { emptyAuditReport } from "@/lib/audit-types";
 import { BOOTH_EVENTS, DEFAULT_BOOTH_EVENT, type BoothEventCode } from "@/lib/booth-events";
+import { emailLooksValid } from "@/lib/email";
 import { SITE } from "@/lib/site-config";
 import { parseScrunchDashboardUrl, scrunchDashboardUrl } from "@/lib/scrunch-app";
 import type { StandDeskRole } from "@/lib/stand-desk";
@@ -12,6 +13,8 @@ import { GenerationWaitPanel } from "@/components/generation-wait-panel";
 import { MentionRateReportFromSnapshot } from "@/components/mention-rate-report";
 import { VisibilityBriefView } from "@/components/visibility-brief";
 import { ScrunchSetupPanel } from "@/components/scrunch-setup-panel";
+import { GeminiUsageLine } from "@/components/gemini-usage-line";
+import { formatGeminiUsage, type GeminiTokenUsage } from "@/lib/gemini-usage";
 
 type VisitFilter = "all" | "today";
 type ReportFilter = "all" | "scrunch" | "micro" | "none";
@@ -142,6 +145,10 @@ export function StandDeskView() {
   const [setupBusy, setSetupBusy] = useState(false);
   const [setupNotice, setSetupNotice] = useState<string | null>(null);
   const [seedBusy, setSeedBusy] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailNotice, setEmailNotice] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [ccAe, setCcAe] = useState(true);
 
   const loadLeads = useCallback(async () => {
     const res = await fetch("/api/admin/leads");
@@ -543,8 +550,14 @@ export function StandDeskView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: lead.id }),
       });
-      const data = (await res.json()) as { success?: boolean; error?: string; warning?: string };
+      const data = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        warning?: string;
+        usage?: GeminiTokenUsage | null;
+      };
       if (!res.ok || !data.success) throw new Error(data.error ?? "Could not generate Scrunch settings");
+      const usageBit = data.usage ? ` ${formatGeminiUsage(data.usage)}.` : "";
       await loadLeads();
       if (lead.scrunchBrandId || lead.scrunchSetup?.scrunchBrandId) {
         const compareRes = await fetch("/api/admin/scrunch/connect", {
@@ -562,12 +575,11 @@ export function StandDeskView() {
         }
         setScrunchDiff(compareData.diff);
         setSetupNotice(
-          data.warning || "Settings generated and compared. Use Sync all missing to push into Scrunch.",
+          `${data.warning || "Settings generated and compared. Use Sync all missing to push into Scrunch."}${usageBit}`,
         );
       } else {
         setSetupNotice(
-          data.warning ||
-            "Settings generated. Save the Scrunch brand id, then Compare to Scrunch and sync.",
+          `${data.warning || "Settings generated. Save the Scrunch brand id, then Compare to Scrunch and sync."}${usageBit}`,
         );
       }
     } catch (err: unknown) {
@@ -628,6 +640,39 @@ export function StandDeskView() {
       setError(msg);
     } finally {
       setSetupBusy(false);
+    }
+  }
+
+  async function onSendReport(lead: StoredBoothLead) {
+    setEmailBusy(true);
+    setEmailError(null);
+    setEmailNotice(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/leads/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lead.id, email: editEmail, ccAe, cc: editAeEmail }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        to?: string;
+        attached?: string[];
+        cc?: string[];
+      };
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Could not send email");
+      if (data.to) setEditEmail(data.to);
+      setEmailNotice(
+        `Sent to ${data.to}${data.cc?.length ? ` (cc ${data.cc.join(", ")})` : ""}${
+          data.attached?.length ? ` · ${data.attached.join(" + ")}` : ""
+        }.`,
+      );
+      await loadLeads();
+    } catch (err: unknown) {
+      setEmailError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -789,6 +834,9 @@ export function StandDeskView() {
     setEditEmail(selected?.email ?? "");
     setEditAeName(selected?.aeName ?? "");
     setEditAeEmail(selected?.aeEmail ?? "");
+    setEmailNotice(null);
+    setEmailError(null);
+    setCcAe(true);
     setScrunchDiff(null);
     setSetupNotice(null);
     setSetupError(null);
@@ -1358,6 +1406,12 @@ export function StandDeskView() {
                   <p className="mt-1 text-sm text-zinc-600">
                     {hostLabel(selected.auditedWebsite)} · {selected.eventName || selected.eventCode || "TFM"}
                   </p>
+                  <div className="mt-2 space-y-0.5">
+                    <GeminiUsageLine usage={selected.lastReport?.usage} label="Last micro-audit" />
+                    {isSuper ? (
+                      <GeminiUsageLine usage={selected.scrunchSetup?.geminiUsage} label="Last Scrunch generate" />
+                    ) : null}
+                  </div>
                   <div className="mt-3 max-w-md">
                     <label className="text-sm font-medium text-zinc-700">
                       Visitor email
@@ -1382,6 +1436,54 @@ export function StandDeskView() {
                         </button>
                       </div>
                     </label>
+                    {/* Email sending is disabled until a Sitecore-approved sender is configured.
+                    <div className="mt-3 rounded-xl border border-[#ece4ff] bg-[#faf8ff] p-3">
+                      <p className="text-sm font-medium text-[#212121]">Send report</p>
+                      <p className="mt-1 text-xs leading-5 text-zinc-500">
+                        Emails{" "}
+                        {[
+                          selected.hasScrunchPdf ? "the official Scrunch PDF" : null,
+                          selected.lastReport ? "the micro-audit brief" : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" and ") || "nothing yet — upload a PDF or run a micro-audit"}
+                        .
+                      </p>
+                      {editEmail.trim().toLowerCase() === SITE.defaultVisitorEmail.toLowerCase() ? (
+                        <p className="mt-2 text-xs text-amber-800">
+                          Enter the visitor’s work email first — this is the booth placeholder.
+                        </p>
+                      ) : null}
+                      {editAeEmail.trim() ? (
+                        <label className="mt-2 flex items-center gap-2 text-xs text-zinc-700">
+                          <input
+                            type="checkbox"
+                            checked={ccAe}
+                            onChange={(e) => setCcAe(e.target.checked)}
+                          />
+                          CC {editAeName || "account exec"} ({editAeEmail})
+                        </label>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={
+                          emailBusy ||
+                          !emailLooksValid(editEmail) ||
+                          editEmail.trim().toLowerCase() === SITE.defaultVisitorEmail.toLowerCase() ||
+                          (!selected.hasScrunchPdf && !selected.lastReport)
+                        }
+                        onClick={() => void onSendReport(selected)}
+                        className="mt-2 rounded-[0.625rem] bg-[#212121] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                      >
+                        {emailBusy ? "Sending…" : "Send report"}
+                      </button>
+                      {emailNotice ? <p className="mt-2 text-sm text-emerald-700">{emailNotice}</p> : null}
+                      {emailError ? <p className="mt-2 text-sm text-red-700">{emailError}</p> : null}
+                    </div>
+                    */}
+                    <p className="mt-3 text-xs text-zinc-500">
+                      Email sending is disabled. Download the PDF from the report instead.
+                    </p>
                     <label className="mt-3 block text-sm font-medium text-zinc-700">
                       Account exec
                       <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">

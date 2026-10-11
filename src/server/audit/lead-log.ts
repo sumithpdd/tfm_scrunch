@@ -3,6 +3,7 @@ import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { FieldValue, type DocumentData, type Timestamp } from "firebase-admin/firestore";
 import type { AeoLead, MentionRateSnapshot, StoredBoothLead } from "@/lib/audit-types";
+import { parseGeminiUsage } from "@/lib/gemini-usage";
 import type { ScrunchBrandSetupDoc } from "@/lib/scrunch-setup-types";
 import {
   type BoothEventCode,
@@ -177,12 +178,14 @@ function asSnapshot(value: unknown): MentionRateSnapshot | null {
         .filter((row): row is MentionRateSnapshot["mentionRates"][number] => Boolean(row))
     : [];
   if (!citationPrompts.length && !mentionRates.length) return null;
+  const usage = parseGeminiUsage(data.usage);
   return {
     brandName: String(data.brandName ?? ""),
     website: String(data.website ?? ""),
     citationPrompts,
     mentionRates,
     generatedAt: String(data.generatedAt ?? ""),
+    ...(usage ? { usage } : {}),
   };
 }
 
