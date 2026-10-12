@@ -48,7 +48,7 @@ Sitecore/Scrunch sellers reusing the Claude skill pack.
 | Report PDF | `src/lib/report-pdf.ts`, `src/components/report-share-actions.tsx` |
 | Email report | `src/app/api/audit/email/route.ts` (disabled until a verified sender exists) |
 | Audit request log | `src/server/audit/event-log.ts` (Firestore `tmf_scrunch_audit_events`) |
-| Public bot guards | `src/server/security/turnstile.ts`, `src/server/security/rate-limit.ts` |
+| Public bot guards | `src/server/security/botid.ts`, `src/server/security/rate-limit.ts` |
 
 ## Common tasks
 
@@ -63,8 +63,8 @@ Sitecore/Scrunch sellers reusing the Claude skill pack.
 - **Email the visitor a PDF**: disabled in the UI and API until a verified sender exists.
   Download PDF still works.
 - **Deploy**: set `GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT_JSON`,
-  `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `LEADS_ADMIN_SECRET`, and in production
-  `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`. See `.env.example`.
+  `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `LEADS_ADMIN_SECRET`. Bot checks use Vercel
+  BotID (no extra keys). See `.env.example`.
 
 ## Do not
 

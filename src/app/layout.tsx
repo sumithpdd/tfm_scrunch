@@ -14,7 +14,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: `${SITE.tagline} · ${SITE.companyName} + ${SITE.productName}`,
-  description: `${SITE.heroHeadline} ${SITE.heroHeadlineEmphasis} — a free AEO/GEO discoverability audit from ${SITE.companyName} and ${SITE.productName}, built for the ${SITE.eventName} booth.`,
+  description: `${SITE.heroHeadline} ${SITE.heroHeadlineEmphasis} — a free AEO/GEO discoverability audit from ${SITE.companyName} and ${SITE.productName}.`,
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
   },

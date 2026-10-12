@@ -13,7 +13,6 @@ import { HoneypotField } from "@/components/honeypot-field";
 import { ReportShareActions } from "@/components/report-share-actions";
 import { GenerationWaitPanel, useGenerationWait } from "@/components/generation-wait-panel";
 import { GeminiUsageLine } from "@/components/gemini-usage-line";
-import { TurnstileWidget, isTurnstileEnabled } from "@/components/turnstile-widget";
 import { VisibilityBriefView } from "@/components/visibility-brief";
 
 function readinessStyle(rating: AeoAuditReport["readiness"] | undefined) {
@@ -61,7 +60,6 @@ export function AuditWorkspace() {
   const [website, setWebsite] = useState(params.get("website") ?? "");
   const [extraUrls, setExtraUrls] = useState(params.get("extra") ?? "");
   const [honeypot, setHoneypot] = useState("");
-  const [captchaToken, setCaptchaToken] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(params.get("consent") === "1");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +69,6 @@ export function AuditWorkspace() {
   const [reachedStages, setReachedStages] = useState<AuditStageId[]>([]);
   const autoRan = useRef(false);
   const wait = useGenerationWait(busy);
-  const captchaNeeded = isTurnstileEnabled();
 
   const runAudit = useCallback(async () => {
     if (!brandName.trim() || !website.trim() || !lead.name.trim() || !lead.email.trim()) {
@@ -84,10 +81,6 @@ export function AuditWorkspace() {
     }
     if (!consentAccepted) {
       setError(SITE.consentLabel);
-      return;
-    }
-    if (captchaNeeded && !captchaToken) {
-      setError("Complete the captcha before running the audit.");
       return;
     }
     setBusy(true);
@@ -106,7 +99,6 @@ export function AuditWorkspace() {
           extraUrls: parseExtraUrls(extraUrls),
           eventCode: SITE.eventCode,
           consentAccepted: true,
-          captchaToken,
           websiteConfirm: honeypot,
         }),
       });
@@ -122,13 +114,11 @@ export function AuditWorkspace() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
-      setCaptchaToken("");
     }
-  }, [brandName, website, extraUrls, lead, consentAccepted, captchaToken, captchaNeeded, honeypot]);
+  }, [brandName, website, extraUrls, lead, consentAccepted, honeypot]);
 
   useEffect(() => {
     if (autoRan.current) return;
-    if (captchaNeeded) return;
     if (params.get("consent") !== "1") return;
     if (!brandName.trim() || !website.trim() || !lead.name.trim() || !lead.email.trim()) return;
     autoRan.current = true;
@@ -210,11 +200,10 @@ export function AuditWorkspace() {
             onChange={setConsentAccepted}
           />
         </div>
-        <TurnstileWidget onToken={setCaptchaToken} />
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            disabled={busy || !consentAccepted || (captchaNeeded && !captchaToken)}
+            disabled={busy || !consentAccepted}
             onClick={() => void runAudit()}
             className="inline-flex min-h-[2.75rem] items-center gap-2 rounded-[0.625rem] bg-[#212121] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >

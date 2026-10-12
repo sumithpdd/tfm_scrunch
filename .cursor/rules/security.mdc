@@ -29,7 +29,6 @@ alwaysApply: true
 | `LEADS_SUPER_ADMIN_SECRET` | Stand admin passcode — archive, hide, remove, Scrunch connect/sync |
 | `RESEND_API_KEY` | Email sending is disabled — reserved for a future verified sender |
 | `EMAIL_FROM` | Email sending is disabled — reserved for a future verified sender |
-| `TURNSTILE_SECRET_KEY` | Server verify for Cloudflare Turnstile on `/api/audit/generate` |
 | `SCRUNCH_API_TOKEN` | Not used in v1 — reserved for a future live Scrunch check |
 
 ## Public API routes
@@ -37,13 +36,12 @@ alwaysApply: true
 This project is intentionally **auth-free** for visitors — a public audit tool, not an internal
 admin app. Public generate must stay bot-resistant:
 
-- `POST /api/audit/generate` — public. Requires consent, a real email, honeypot empty, Turnstile
-  when `TURNSTILE_SECRET_KEY` is set, and in-process rate limits (IP + email). Logs every
+- `POST /api/audit/generate` — public. Requires consent, a real email, honeypot empty,
+  Vercel BotID (`checkBotId()`), and in-process rate limits (IP + email). Logs every
   attempt to `tmf_scrunch_audit_events`. Keep those guards — this route calls a paid Gemini API.
 - `POST /api/audit/email` and `POST /api/marketing-skills/email` — disabled (503) until a
   verified sender exists.
 - `GET /api/marketing-skills` — public, read-only, serves from code (`marketing-skills-seed.ts`).
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — public site key for the captcha widget.
 - `/stand-desk` and `/api/admin/leads*` — **not public**. Gated by `LEADS_ADMIN_SECRET` (booth AE)
   or `LEADS_SUPER_ADMIN_SECRET` (stand admin) via an httpOnly cookie. Do not link this from the
   visitor nav. This is not Firebase Auth — it is a booth passcode so visitor PII is not on an

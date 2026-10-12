@@ -7,6 +7,7 @@ import { getAdminDb, isServerFirestoreAvailable } from "@/server/db/firestore-ad
 export type AuditEventOutcome =
   | "blocked_rate"
   | "blocked_captcha"
+  | "blocked_bot"
   | "blocked_honeypot"
   | "blocked_validation"
   | "started"

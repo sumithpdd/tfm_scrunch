@@ -10,7 +10,7 @@ import { parseExtraUrls, type AuditStreamEvent } from "@/lib/audit-progress";
 import { emailLooksValid, normalizeEmail } from "@/lib/email";
 import { SITE } from "@/lib/site-config";
 import { clientIp, hitRateLimit, userAgent } from "@/server/security/rate-limit";
-import { verifyTurnstileToken } from "@/server/security/turnstile";
+import { verifyHumanRequest } from "@/server/security/botid";
 
 export const maxDuration = 60;
 
@@ -141,19 +141,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const captcha = await verifyTurnstileToken(body.captchaToken, ip);
-  if (!captcha.ok) {
+  const botCheck = await verifyHumanRequest();
+  if (!botCheck.ok) {
     await logAuditEvent({
-      outcome: "blocked_captcha",
+      outcome: "blocked_bot",
       ip,
       userAgent: ua,
       name,
       email,
       company,
       website,
-      error: captcha.error,
+      error: botCheck.error,
     });
-    return NextResponse.json({ success: false, error: captcha.error }, { status: 403 });
+    return NextResponse.json({ success: false, error: botCheck.error }, { status: 403 });
   }
 
   const eventCode = parseBoothEventCode(body.eventCode || SITE.eventCode);

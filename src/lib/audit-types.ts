@@ -208,7 +208,6 @@ export type GenerateAuditRequest = {
   extraUrls?: string[];
   consentAccepted: boolean;
   eventCode?: string;
-  captchaToken?: string;
   websiteConfirm?: string;
 };
 

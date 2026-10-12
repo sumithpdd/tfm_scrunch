@@ -8,7 +8,7 @@ function prune(times: number[], now: number, windowMs: number): number[] {
   return times.filter((t) => now - t < windowMs);
 }
 
-/** In-process sliding window. Resets on deploy — good enough with Turnstile in front. */
+/** In-process sliding window. Resets on deploy — pairs with Vercel BotID on generate. */
 export function hitRateLimit(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
   const current = buckets.get(key) ?? { times: [] };
