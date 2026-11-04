@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Secrets
 
-- **Never** commit `.env.local`, `GEMINI_API_KEY`, or a real `SCRUNCH_API_TOKEN`.
+- **Never** commit `.env.local`, `AZURE_OPENAI_API_KEY`, `GEMINI_API_KEY`, or a real `SCRUNCH_API_TOKEN`.
 - **Never** put real API keys or Scrunch org/brand ids in README, docs, UI placeholders, or
   `.env.example` (generic placeholders only).
 - Visitor names and emails live in Firestore `tmf_scrunch_leads`, visibility briefs
@@ -22,7 +22,9 @@ alwaysApply: true
 
 | Variable | Purpose |
 |----------|---------|
-| `GEMINI_API_KEY` | Powers the free AEO/GEO audit generation |
+| `AI_PROVIDER` | Switches audit generation between `azure` (default) and `gemini` -- see `src/lib/gemini-config.ts` |
+| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_RESOURCE_NAME` / `AZURE_OPENAI_DEPLOYMENT` | Powers the free AEO/GEO audit generation when `AI_PROVIDER=azure` (org IT AI sandbox) |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Powers audit generation when `AI_PROVIDER=gemini` |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Admin SDK — writes booth leads to `tmf_scrunch_leads` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Local alternative path to the service-account JSON file |
 | `LEADS_ADMIN_SECRET` | Booth AE passcode for `/stand-desk` (view, add, run audits) |
@@ -38,7 +40,7 @@ admin app. Public generate must stay bot-resistant:
 
 - `POST /api/audit/generate` — public. Requires consent, a real email, honeypot empty,
   Vercel BotID (`checkBotId()`), and in-process rate limits (IP + email). Logs every
-  attempt to `tmf_scrunch_audit_events`. Keep those guards — this route calls a paid Gemini API.
+  attempt to `tmf_scrunch_audit_events`. Keep those guards — this route calls a paid Azure OpenAI deployment.
 - `POST /api/audit/email` and `POST /api/marketing-skills/email` — disabled (503) until a
   verified sender exists.
 - `GET /api/marketing-skills` — public, read-only, serves from code (`marketing-skills-seed.ts`).

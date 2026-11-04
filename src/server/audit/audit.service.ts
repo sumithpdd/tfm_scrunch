@@ -1,7 +1,6 @@
 import "server-only";
 import { generateObject, generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { getGeminiModelId, formatGeminiError } from "@/lib/gemini-config";
+import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError } from "@/lib/gemini-config";
 import { addGeminiUsage, usageFromAiResult, type GeminiTokenUsage } from "@/lib/gemini-usage";
 import type { AeoAuditReport } from "@/lib/audit-types";
 import { emptyAuditReport } from "@/lib/audit-types";
@@ -12,16 +11,6 @@ import {
 } from "@/server/audit/prompts/audit-brief";
 import { fetchPublicPageText } from "@/server/audit/fetch-public-page";
 
-let providerSingleton: ReturnType<typeof createGoogleGenerativeAI> | null = null;
-
-function getProvider() {
-  if (!providerSingleton) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
-    providerSingleton = createGoogleGenerativeAI({ apiKey });
-  }
-  return providerSingleton;
-}
 
 function parseJsonLoose(text: string): unknown {
   const fenced = text.match(/```json\s*([\s\S]*?)```/i);
@@ -59,7 +48,7 @@ function normalizeReport(generated: AeoAuditGenerated): AeoAuditReport {
       nonBrandedPct: prompts.length ? Math.round((nonBranded / prompts.length) * 100) : 0,
       platforms: 9,
     },
-    source: "gemini",
+    source: getActiveProviderName() === "gemini" ? "gemini" : "azure-openai",
   };
 }
 
@@ -104,8 +93,7 @@ ${extraBlock}
 `;
 
   try {
-    const provider = getProvider();
-    const model = provider(getGeminiModelId());
+    const model = getModel();
 
     const modelId = getGeminiModelId();
     notify?.({

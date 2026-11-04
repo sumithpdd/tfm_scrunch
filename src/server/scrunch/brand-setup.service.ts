@@ -1,7 +1,6 @@
 import "server-only";
 import { generateObject, generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { getGeminiModelId, formatGeminiError } from "@/lib/gemini-config";
+import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError } from "@/lib/gemini-config";
 import { addGeminiUsage, usageFromAiResult, type GeminiTokenUsage } from "@/lib/gemini-usage";
 import {
   SCRUNCH_PLATFORM_TOKENS,
@@ -17,16 +16,6 @@ import {
 import { fetchPublicPageText } from "@/server/audit/fetch-public-page";
 import { DEFAULT_SCRUNCH_SUCCESS_MEASURES } from "@/lib/scrunch-blank-intake";
 
-let providerSingleton: ReturnType<typeof createGoogleGenerativeAI> | null = null;
-
-function getProvider() {
-  if (!providerSingleton) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
-    providerSingleton = createGoogleGenerativeAI({ apiKey });
-  }
-  return providerSingleton;
-}
 
 export type GenerateScrunchInput = {
   setupId: string;
@@ -122,7 +111,7 @@ function normalizeSheet(
     scrunchBrandId: input.scrunchBrandId || "",
     createdByUid: input.createdByUid || "",
     createdByEmail: input.createdByUid || "",
-    source: "gemini",
+    source: getActiveProviderName() === "gemini" ? "gemini" : "azure-openai",
     skillSourceUrl: "https://github.com/rjzflynnbx/scrunch-brand-setup-v1",
   };
 }
@@ -192,8 +181,7 @@ ${page.text || "(empty — use public knowledge; note gaps in openQuestions)"}
 Do not invent owned domains or stakeholder emails.`;
 
   try {
-    const provider = getProvider();
-    const model = provider(getGeminiModelId());
+    const model = getModel();
 
     const modelId = getGeminiModelId();
     let generated: ScrunchSheetGenerated;

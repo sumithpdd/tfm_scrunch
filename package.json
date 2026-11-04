@@ -10,6 +10,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/azure": "^4.0.116",
     "@ai-sdk/google": "^4.0.1",
     "ai": "^7.0.3",
     "botid": "^1.5.11",

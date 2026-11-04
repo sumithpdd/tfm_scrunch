@@ -18,7 +18,8 @@ Admin to Firestore collection `tmf_scrunch_leads`.
 1. Visitor submits name, company, email, and website on `/`.
 2. `/audit` calls `POST /api/audit/generate`, which:
    - fetches the visitor's homepage text (SSRF-safe),
-   - asks Gemini to research the brand and produce a Scrunch-style visibility brief (presence,
+   - asks the configured model (Azure OpenAI org sandbox; was Gemini) to research the brand and
+     produce a Scrunch-style visibility brief (presence,
      position, citation share, sentiment), personas, topics, competitors, and sample prompts,
    - upserts the lead into Firestore `tmf_scrunch_leads` and the visibility brief + PDF into
      `tmf_scrunch_reports` (one document per website).
@@ -32,7 +33,7 @@ lead-gen teaser for that.
 
 ```bash
 npm install
-cp .env.example .env.local   # add GEMINI_API_KEY + Firebase Admin vars
+cp .env.example .env.local   # add AZURE_OPENAI_* and/or GEMINI_* vars + Firebase Admin vars
 npm run dev
 ```
 
@@ -50,7 +51,9 @@ lives in one place: `src/lib/site-config.ts`.
 
 ## Deploy
 
-Vercel (or similar): set `GEMINI_API_KEY` (required) plus `FIREBASE_SERVICE_ACCOUNT_JSON`,
+Vercel (or similar): set `AI_PROVIDER` (`azure` default; `gemini` to switch providers),
+plus whichever provider's keys it points at -- `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_RESOURCE_NAME`,
+`AZURE_OPENAI_DEPLOYMENT`, or `GEMINI_API_KEY`, `GEMINI_MODEL` -- plus `FIREBASE_SERVICE_ACCOUNT_JSON`,
 `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `LEADS_ADMIN_SECRET` so booth leads persist and the stand
 desk can open. See `.env.example`.
 

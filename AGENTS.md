@@ -5,8 +5,11 @@ Guidance for AI coding agents working in this repository.
 ## Project
 
 **TFM Scrunch** — a public-facing Next.js microsite for a free, light-touch **AEO/GEO
-discoverability audit**. Visitors enter their name, work email, company, website, and optional
-extra page URLs. Gemini researches the site. A second page, **AI Marketing Skills**, is a
+discoverability audit**, built for Sitecore's booth at two events: **The Martech Summit**
+(10-11 Nov) and a follow-on event (24-25 Nov). Visitors enter their name, work email, company,
+website, and optional extra page URLs. The model that researches the site is switchable --
+Azure OpenAI (org IT AI sandbox, currently the default) or Gemini -- via `AI_PROVIDER` in
+`.env.local`; see `src/lib/gemini-config.ts`. A second page, **AI Marketing Skills**, is a
 Claude-ready prompt library.
 
 Forked from the `/scrunch` and `/ai-marketing-skills` routes of `SitecoreAiDemoSenario`. No
@@ -33,7 +36,7 @@ Sitecore/Scrunch sellers reusing the Claude skill pack.
 | Landing page + lead form | `src/app/page.tsx`, `src/components/lead-capture-hero.tsx` |
 | Audit results UI | `src/app/audit/page.tsx`, `src/components/audit-workspace.tsx`, `src/components/mention-rate-report.tsx` |
 | Audit types | `src/lib/audit-types.ts` |
-| Audit Gemini prompt/schema | `src/server/audit/prompts/audit-brief.ts` |
+| Audit model prompt/schema | `src/server/audit/prompts/audit-brief.ts` |
 | Audit generation service | `src/server/audit/audit.service.ts` |
 | Audit API route | `src/app/api/audit/generate/route.ts` |
 | Lead capture | `src/server/audit/lead-log.ts` (Firestore `tmf_scrunch_leads` + `data/leads.jsonl`) |
@@ -62,16 +65,18 @@ Sitecore/Scrunch sellers reusing the Claude skill pack.
   local fallback.
 - **Email the visitor a PDF**: disabled in the UI and API until a verified sender exists.
   Download PDF still works.
-- **Deploy**: set `GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT_JSON`,
-  `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `LEADS_ADMIN_SECRET`. Bot checks use Vercel
-  BotID (no extra keys). See `.env.example`.
+- **Deploy**: set `AI_PROVIDER` (`azure` default, or `gemini`), `AZURE_OPENAI_API_KEY`,
+  `AZURE_OPENAI_RESOURCE_NAME`, `AZURE_OPENAI_DEPLOYMENT`, `GEMINI_API_KEY`, `GEMINI_MODEL`,
+  `FIREBASE_SERVICE_ACCOUNT_JSON`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `LEADS_ADMIN_SECRET`.
+  Bot checks use Vercel BotID (no extra keys). See `.env.example`.
 
 ## Do not
 
-- Put API keys, Gemini keys, or Scrunch org/brand ids in markdown, UI placeholders, or committed
-  env files.
-- Call Gemini from client components (server routes / server-only modules only).
+- Put API keys (Azure OpenAI, Gemini, Firebase, Scrunch) or Scrunch org/brand ids in markdown, UI
+  placeholders, or committed env files.
+- Call the model provider from client components (server routes / server-only modules only).
 - Add a login/auth layer on the visitor kiosk without also adding a reason — booth visitors should
   never see a sign-in screen. The `/stand-desk` passcode is staff-only and must stay off the nav.
-- Claim the audit is a live Scrunch/AI-assistant check. It is Gemini research and hypothesis
-  generation — say so in the UI and prompt (`AUDIT_SYSTEM_PROMPT` enforces this; keep it that way).
+- Claim the audit is a live Scrunch/AI-assistant check. It is model-driven research and
+  hypothesis generation — say so in the UI and prompt (`AUDIT_SYSTEM_PROMPT` enforces this; keep
+  it that way).

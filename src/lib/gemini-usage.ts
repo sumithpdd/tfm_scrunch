@@ -1,17 +1,26 @@
-/** Token counts returned by the AI SDK after a Gemini generate. */
+/**
+ * Token counts returned by the AI SDK after a model generate. Provider-agnostic: the Vercel
+ * AI SDK normalizes usage the same way for Azure OpenAI and Gemini, so this parsing logic
+ * works unmodified whichever one AI_PROVIDER currently selects (see gemini-config.ts).
+ */
 
 export type GeminiTokenUsage = {
   model: string;
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
-  /** Intro Gemini 3.8 Flash rates unless GEMINI_*_USD_PER_MILLION is set. */
+  /** Azure gpt-4o list rates by default unless GEMINI_*_USD_PER_MILLION is set. */
   estimatedUsd: number;
 };
 
-/** Gemini 3.8 Flash intro rates through 31 Dec 2026 ($/1M tokens). */
-const DEFAULT_INPUT_USD_PER_M = 0.75;
-const DEFAULT_OUTPUT_USD_PER_M = 3.75;
+/**
+ * Default cost estimate assumes the Azure gpt-4o deployment ($2.50 / $10 per 1M tokens as of
+ * Nov 2026 -- notably pricier than gpt-4o-mini, so these are NOT mini rates). Override via
+ * GEMINI_INPUT_USD_PER_MILLION / GEMINI_OUTPUT_USD_PER_MILLION if your deployment or active
+ * provider differs (e.g. back on Gemini, or a gpt-4o-mini deployment).
+ */
+const DEFAULT_INPUT_USD_PER_M = 2.5;
+const DEFAULT_OUTPUT_USD_PER_M = 10;
 
 function asInt(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);

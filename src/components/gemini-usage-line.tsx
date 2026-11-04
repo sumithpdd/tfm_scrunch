@@ -2,7 +2,7 @@ import { formatGeminiUsage, type GeminiTokenUsage } from "@/lib/gemini-usage";
 
 export function GeminiUsageLine({
   usage,
-  label = "Gemini",
+  label = "AI usage",
 }: {
   usage?: GeminiTokenUsage | null;
   label?: string;

@@ -96,7 +96,7 @@ export type ScrunchBrandSetupDoc = {
   /** Email of the AE or visitor who owns this setup — never leave undefined for Firestore. */
   createdByUid: string;
   createdByEmail: string;
-  source: "gemini" | "intake";
+  source: "gemini" | "azure-openai" | "intake";
   skillSourceUrl: string;
   geminiUsage?: GeminiTokenUsage;
   updatedAt?: unknown;

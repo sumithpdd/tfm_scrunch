@@ -12,7 +12,7 @@ skills catalog, or deployment.
 ## Security (always)
 
 - No real keys in docs, `.env.example`, or commits
-- Server-only: `GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT_JSON` (or `GOOGLE_APPLICATION_CREDENTIALS`),
+- Server-only: `AI_PROVIDER` (`azure` default, or `gemini`) picks the engine; `AZURE_OPENAI_API_KEY`/`AZURE_OPENAI_RESOURCE_NAME`/`AZURE_OPENAI_DEPLOYMENT` for Azure, `GEMINI_API_KEY`/`GEMINI_MODEL` for Gemini, `FIREBASE_SERVICE_ACCOUNT_JSON` (or `GOOGLE_APPLICATION_CREDENTIALS`),
   `LEADS_ADMIN_SECRET`
 - `/api/audit/generate` and `/api/marketing-skills` are intentionally public — do not add auth
   without a real login flow to back it
