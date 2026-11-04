@@ -25,20 +25,24 @@ export type AiKeyStatus = {
 
 let cache: { value: StoredAiSettings; at: number } | null = null;
 
+function serverEnv(name: string): string {
+  return String((process.env as Record<string, string | undefined>)[name] ?? "").trim();
+}
+
 export function envAiSettings(): AiRuntimeSettings {
-  const raw = process.env.AI_PROVIDER?.trim().toLowerCase();
+  const raw = serverEnv("AI_PROVIDER").toLowerCase();
   return {
     provider: raw === "gemini" ? "gemini" : "azure",
-    azureDeployment: process.env.AZURE_OPENAI_DEPLOYMENT?.trim() || DEFAULT_AZURE_DEPLOYMENT,
-    geminiModel: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+    azureDeployment: serverEnv("AZURE_OPENAI_DEPLOYMENT") || DEFAULT_AZURE_DEPLOYMENT,
+    geminiModel: serverEnv("GEMINI_MODEL") || DEFAULT_GEMINI_MODEL,
   };
 }
 
 export function aiKeyStatus(): AiKeyStatus {
   return {
-    azure: Boolean(process.env.AZURE_OPENAI_API_KEY?.trim()),
-    azureResource: Boolean(process.env.AZURE_OPENAI_RESOURCE_NAME?.trim()),
-    gemini: Boolean(process.env.GEMINI_API_KEY?.trim()),
+    azure: Boolean(serverEnv("AZURE_OPENAI_API_KEY")),
+    azureResource: Boolean(serverEnv("AZURE_OPENAI_RESOURCE_NAME")),
+    gemini: Boolean(serverEnv("GEMINI_API_KEY") || serverEnv("GOOGLE_GENERATIVE_AI_API_KEY")),
   };
 }
 
