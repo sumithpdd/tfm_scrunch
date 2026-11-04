@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DEFAULT_BOOTH_EVENT, type BoothEventCode } from "@/lib/booth-events";
 import { SITE } from "@/lib/site-config";
 import { emailLooksValid } from "@/lib/email";
 import { DataConsentCheckbox } from "@/components/data-consent-checkbox";
+import { EventSelect } from "@/components/event-select";
 import { HoneypotField } from "@/components/honeypot-field";
 
 export function LeadCaptureHero() {
@@ -15,6 +17,7 @@ export function LeadCaptureHero() {
   const [website, setWebsite] = useState("");
   const [extraUrls, setExtraUrls] = useState("");
   const [honeypot, setHoneypot] = useState("");
+  const [eventCode, setEventCode] = useState<BoothEventCode>(DEFAULT_BOOTH_EVENT);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +43,7 @@ export function LeadCaptureHero() {
       email: email.trim(),
       website: website.trim(),
       extra: extraUrls.trim(),
+      event: eventCode,
       consent: "1",
     });
     router.push(`/audit?${params.toString()}`);
@@ -93,6 +97,7 @@ export function LeadCaptureHero() {
               Product, about, or docs pages help the audit. One URL per line.
             </p>
           </label>
+          <EventSelect value={eventCode} onChange={setEventCode} />
           <DataConsentCheckbox checked={consentAccepted} onChange={setConsentAccepted} />
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
           <button

@@ -327,12 +327,12 @@ export async function updateLeadEmail(id: string, email: string): Promise<Stored
 async function migrateUncodedLeadsToTfm() {
   const snap = await getAdminDb().collection(LEADS_COLLECTION).get();
   const pending = snap.docs.filter((doc) => {
-    const code = String(doc.data().eventCode ?? "").trim().toUpperCase();
-    return code !== "TFM" && code !== "DMEXCO" && code !== "USERGROUP";
+    const code = String(doc.data().eventCode ?? "").trim();
+    return !code;
   });
   if (pending.length === 0) return;
   const db = getAdminDb();
-  const patch = { eventCode: DEFAULT_BOOTH_EVENT, eventName: boothEventName(DEFAULT_BOOTH_EVENT) };
+  const patch = { eventCode: "TFM", eventName: boothEventName("TFM") };
   for (let i = 0; i < pending.length; i += 400) {
     const batch = db.batch();
     for (const doc of pending.slice(i, i + 400)) {

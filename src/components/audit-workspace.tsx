@@ -5,10 +5,12 @@ import { useSearchParams } from "next/navigation";
 import type { AeoAuditReport, AeoLead } from "@/lib/audit-types";
 import { AUDIT_STAGE_ORDER, parseExtraUrls, type AuditStageId } from "@/lib/audit-progress";
 import { readAuditGenerateStream } from "@/lib/audit-stream";
+import { DEFAULT_BOOTH_EVENT, parseBoothEventCode, type BoothEventCode } from "@/lib/booth-events";
 import { emailLooksValid } from "@/lib/email";
 import { SITE } from "@/lib/site-config";
 import { MentionRateReport } from "@/components/mention-rate-report";
 import { DataConsentCheckbox } from "@/components/data-consent-checkbox";
+import { EventSelect } from "@/components/event-select";
 import { HoneypotField } from "@/components/honeypot-field";
 import { ReportShareActions } from "@/components/report-share-actions";
 import { GenerationWaitPanel, useGenerationWait } from "@/components/generation-wait-panel";
@@ -60,6 +62,9 @@ export function AuditWorkspace() {
   const [website, setWebsite] = useState(params.get("website") ?? "");
   const [extraUrls, setExtraUrls] = useState(params.get("extra") ?? "");
   const [honeypot, setHoneypot] = useState("");
+  const [eventCode, setEventCode] = useState<BoothEventCode>(
+    parseBoothEventCode(params.get("event") || DEFAULT_BOOTH_EVENT),
+  );
   const [consentAccepted, setConsentAccepted] = useState(params.get("consent") === "1");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +102,7 @@ export function AuditWorkspace() {
           brandName: brandName.trim(),
           website: website.trim(),
           extraUrls: parseExtraUrls(extraUrls),
-          eventCode: SITE.eventCode,
+          eventCode,
           consentAccepted: true,
           websiteConfirm: honeypot,
         }),
@@ -115,7 +120,7 @@ export function AuditWorkspace() {
     } finally {
       setBusy(false);
     }
-  }, [brandName, website, extraUrls, lead, consentAccepted, honeypot]);
+  }, [brandName, website, extraUrls, lead, consentAccepted, honeypot, eventCode]);
 
   useEffect(() => {
     if (autoRan.current) return;
@@ -193,6 +198,9 @@ export function AuditWorkspace() {
             onChange={(e) => setExtraUrls(e.target.value)}
           />
         </label>
+        <div className="mt-4">
+          <EventSelect value={eventCode} onChange={setEventCode} />
+        </div>
         <div className="mt-4">
           <DataConsentCheckbox
             id="audit-data-consent"

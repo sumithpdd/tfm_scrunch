@@ -19,7 +19,8 @@ import { formatGeminiUsage, type GeminiTokenUsage } from "@/lib/gemini-usage";
 
 type VisitFilter = "all" | "today";
 type ReportFilter = "all" | "scrunch" | "micro" | "none";
-type SortKey = "recent" | "company";
+type SortKey = "company" | "created" | "updated";
+type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 20;
 
@@ -113,7 +114,8 @@ export function StandDeskView() {
   const [eventFilter, setEventFilter] = useState<BoothEventCode>(DEFAULT_BOOTH_EVENT);
   const [reportFilter, setReportFilter] = useState<ReportFilter>("all");
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
-  const [sortKey, setSortKey] = useState<SortKey>("company");
+  const [sortKey, setSortKey] = useState<SortKey>("updated");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -700,9 +702,12 @@ export function StandDeskView() {
   const isSuper = role === "super";
 
   const eventCounts = useMemo(() => {
-    const counts = { TFM: 0, DMEXCO: 0, USERGROUP: 0 } as Record<BoothEventCode, number>;
+    const counts = Object.fromEntries(BOOTH_EVENTS.map((event) => [event.code, 0])) as Record<
+      BoothEventCode,
+      number
+    >;
     for (const lead of leads) {
-      const code = (lead.eventCode || DEFAULT_BOOTH_EVENT) as BoothEventCode;
+      const code = (lead.eventCode || "TFM") as BoothEventCode;
       if (code in counts) counts[code] += 1;
     }
     return counts;
@@ -749,13 +754,16 @@ export function StandDeskView() {
       return hay.includes(q);
     });
     rows.sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
       if (sortKey === "company") {
-        return (a.company || a.auditedBrand).localeCompare(b.company || b.auditedBrand);
+        return dir * (a.company || a.auditedBrand).localeCompare(b.company || b.auditedBrand);
       }
-      return (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt);
+      const aStamp = sortKey === "created" ? a.createdAt || a.updatedAt : a.updatedAt || a.createdAt;
+      const bStamp = sortKey === "created" ? b.createdAt || b.updatedAt : b.updatedAt || b.createdAt;
+      return dir * aStamp.localeCompare(bStamp);
     });
     return rows;
-  }, [leads, query, visitFilter, reportFilter, sortKey, eventFilter, archiveFilter, aeFilter, isSuper]);
+  }, [leads, query, visitFilter, reportFilter, sortKey, sortDir, eventFilter, archiveFilter, aeFilter, isSuper]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
@@ -772,7 +780,7 @@ export function StandDeskView() {
 
   useEffect(() => {
     setPage(0);
-  }, [query, visitFilter, reportFilter, sortKey, eventFilter, archiveFilter, aeFilter]);
+  }, [query, visitFilter, reportFilter, sortKey, sortDir, eventFilter, archiveFilter, aeFilter]);
 
   const selected = filtered.find((l) => l.id === selectedId) ?? leads.find((l) => l.id === selectedId) ?? null;
   const selectedIndex = selected ? filtered.findIndex((l) => l.id === selected.id) : -1;
@@ -906,9 +914,9 @@ export function StandDeskView() {
             </p>
             <h1 className="mt-2 font-serif text-3xl font-semibold text-[#212121]">Booth companies</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-              Filter by event — TFM, DMEXCO, and Usergroup can run the same day. Existing
-              records without an event stay on TFM. Search a company, open its Scrunch PDF, or
-              run a live micro-audit. {stats.total} companies on this event.
+              Filter by event — MarTech Summit (10–11 Nov) is the default. 24–25 November,
+              public audits, and older TFM / DMEXCO / Usergroup records stay on their own
+              tabs. {stats.total} companies on this event.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1068,7 +1076,7 @@ export function StandDeskView() {
               >
                 {BOOTH_EVENTS.map((event) => (
                   <option key={event.code} value={event.code}>
-                    {event.label} — {event.name}
+                    {event.dates ? `${event.label} — ${event.dates}` : `${event.label} — ${event.name}`}
                   </option>
                 ))}
               </select>
@@ -1201,11 +1209,19 @@ export function StandDeskView() {
               Sort
               <select
                 className={`${inputClass} mt-1`}
-                value={sortKey}
-                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                value={`${sortKey}:${sortDir}`}
+                onChange={(e) => {
+                  const [key, dir] = e.target.value.split(":") as [SortKey, SortDir];
+                  setSortKey(key);
+                  setSortDir(dir);
+                }}
               >
-                <option value="company">A–Z</option>
-                <option value="recent">Recent</option>
+                <option value="updated:desc">Updated — newest</option>
+                <option value="updated:asc">Updated — oldest</option>
+                <option value="created:desc">Created — newest</option>
+                <option value="created:asc">Created — oldest</option>
+                <option value="company:asc">Company A–Z</option>
+                <option value="company:desc">Company Z–A</option>
               </select>
             </label>
           </div>
@@ -1264,15 +1280,55 @@ export function StandDeskView() {
             </p>
           ) : (
             <div className={reportFullscreen ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto"}>
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[860px] text-left text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-zinc-500">
-                    <th className="py-2 pr-3 font-semibold">Company</th>
+                    <th className="py-2 pr-3 font-semibold">
+                      <SortHeader
+                        label="Company"
+                        active={sortKey === "company"}
+                        dir={sortDir}
+                        onClick={() => {
+                          if (sortKey === "company") setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                          else {
+                            setSortKey("company");
+                            setSortDir("asc");
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="py-2 pr-3 font-semibold">AE</th>
                     <th className="py-2 pr-3 font-semibold">Website</th>
                     <th className="py-2 pr-3 font-semibold">Event</th>
                     <th className="py-2 pr-3 font-semibold">Reports</th>
-                    <th className="py-2 pr-3 font-semibold">Updated</th>
+                    <th className="py-2 pr-3 font-semibold">
+                      <SortHeader
+                        label="Created"
+                        active={sortKey === "created"}
+                        dir={sortDir}
+                        onClick={() => {
+                          if (sortKey === "created") setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                          else {
+                            setSortKey("created");
+                            setSortDir("desc");
+                          }
+                        }}
+                      />
+                    </th>
+                    <th className="py-2 pr-3 font-semibold">
+                      <SortHeader
+                        label="Updated"
+                        active={sortKey === "updated"}
+                        dir={sortDir}
+                        onClick={() => {
+                          if (sortKey === "updated") setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                          else {
+                            setSortKey("updated");
+                            setSortDir("desc");
+                          }
+                        }}
+                      />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1337,6 +1393,9 @@ export function StandDeskView() {
                               <span className="text-xs text-zinc-400">None</span>
                             ) : null}
                           </div>
+                        </td>
+                        <td className="py-2.5 pr-3 whitespace-nowrap text-xs text-zinc-600">
+                          {formatWhen(lead.createdAt)}
                         </td>
                         <td className="py-2.5 pr-3 whitespace-nowrap text-xs text-zinc-600">
                           {formatWhen(lead.updatedAt || lead.createdAt)}
@@ -1856,6 +1915,33 @@ function SelectedReportPanels({
         </div>
       )}
     </div>
+  );
+}
+
+function SortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 uppercase tracking-wide ${
+        active ? "text-[#212121]" : "text-zinc-500 hover:text-zinc-800"
+      }`}
+    >
+      {label}
+      <span className="text-[10px] font-semibold" aria-hidden>
+        {active ? (dir === "asc" ? "↑" : "↓") : "↕"}
+      </span>
+    </button>
   );
 }
 

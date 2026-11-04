@@ -4,9 +4,9 @@
  * see AGENTS.md "Before you change code".
  */
 export const SITE = {
-  eventCode: "PUBLIC",
-  eventName: "Public AEO/GEO audit",
-  eventUrl: "https://www.sitecore.com/",
+  eventCode: "MARTECH",
+  eventName: "The MarTech Summit London",
+  eventUrl: "https://themartechsummit.com/",
   companyName: "Sitecore",
   productName: "Scrunch",
   presenterName: "Sumith Damodaran",
