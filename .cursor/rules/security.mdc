@@ -15,7 +15,9 @@ alwaysApply: true
   `tmf_scrunch_pdfs`, request logs in `tmf_scrunch_audit_events` (hashed IP), runtime AI
   provider/model in `tmf_scrunch_settings/app`, and the gitignored `data/leads.jsonl` fallback.
   Do not commit PII, and do not add analytics that ships it anywhere else without asking.
-- Do not store API keys in Firestore or the admin UI. Provider and model *names* only.
+- Super admin may store Azure/Gemini keys in Firestore `tmf_scrunch_settings/app` via
+  `/stand-desk/settings` so they can be changed without a redeploy. Still never commit keys,
+  put them in README, or expose them on public routes. AEs cannot read this page.
 - Do not add a client Firestore SDK or security rules that let the browser read `tmf_scrunch_leads`,
   `tmf_scrunch_reports`, or `tmf_scrunch_settings`. Writes go through Firebase Admin only.
 
@@ -24,8 +26,8 @@ alwaysApply: true
 | Variable | Purpose |
 |----------|---------|
 | `AI_PROVIDER` | Fallback if Firestore settings are empty. Live switch is `/stand-desk/settings` (`tmf_scrunch_settings/app`) |
-| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_RESOURCE_NAME` / `AZURE_OPENAI_DEPLOYMENT` | Azure keys stay in env. Deployment name can be overridden in admin Settings |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | Gemini key stays in env. Model id can be overridden in admin Settings |
+| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_RESOURCE_NAME` / `AZURE_OPENAI_DEPLOYMENT` | Fallback if Settings has no Azure key/resource. Live values can be stored in `tmf_scrunch_settings/app` |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Fallback if Settings has no Gemini key. Live values can be stored in `tmf_scrunch_settings/app` |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Admin SDK — writes booth leads to `tmf_scrunch_leads` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Local alternative path to the service-account JSON file |
 | `LEADS_ADMIN_SECRET` | Booth AE passcode for `/stand-desk` (view, add, run audits) |

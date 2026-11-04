@@ -2,9 +2,8 @@ import "server-only";
 /**
  * Model/provider factory for the booth audit + Scrunch brand-setup generation.
  *
- * Live switch lives in Firestore `tmf_scrunch_settings/app` (stand-desk Settings, super admin).
- * Env vars `AI_PROVIDER`, `AZURE_OPENAI_DEPLOYMENT`, `GEMINI_MODEL` are the fallback until
- * that document exists. API keys stay in env and are never written to Firestore.
+ * Live switch lives in Firestore `tmf_scrunch_settings/app` (stand-desk Settings, super admin),
+ * including optional API key overrides. Env vars are the fallback.
  */
 import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -24,9 +23,7 @@ let azureSingletonKey = "";
 let geminiSingleton: ReturnType<typeof createGoogleGenerativeAI> | null = null;
 let geminiSingletonKey = "";
 
-function getAzureProvider() {
-  const apiKey = serverEnv("AZURE_OPENAI_API_KEY");
-  const resourceName = serverEnv("AZURE_OPENAI_RESOURCE_NAME");
+function getAzureProvider(apiKey: string, resourceName: string) {
   if (!apiKey) throw new Error("AZURE_OPENAI_API_KEY is not configured");
   if (!resourceName) throw new Error("AZURE_OPENAI_RESOURCE_NAME is not configured");
   const fingerprint = `${apiKey}:${resourceName}`;
@@ -41,8 +38,7 @@ function getAzureProvider() {
   return azureSingleton;
 }
 
-function getGeminiProvider() {
-  const apiKey = serverEnv("GEMINI_API_KEY") || serverEnv("GOOGLE_GENERATIVE_AI_API_KEY");
+function getGeminiProvider(apiKey: string) {
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
   if (!geminiSingleton || geminiSingletonKey !== apiKey) {
     geminiSingletonKey = apiKey;
@@ -53,9 +49,9 @@ function getGeminiProvider() {
 
 export function getModelFor(settings: AiRuntimeSettings) {
   if (settings.provider === "gemini") {
-    return getGeminiProvider()(settings.geminiModel);
+    return getGeminiProvider(settings.geminiApiKey)(settings.geminiModel);
   }
-  return getAzureProvider()(settings.azureDeployment);
+  return getAzureProvider(settings.azureApiKey, settings.azureResourceName)(settings.azureDeployment);
 }
 
 export async function getModel() {

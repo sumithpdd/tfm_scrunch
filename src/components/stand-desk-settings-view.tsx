@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AZURE_DEPLOYMENT_PRESETS,
   GEMINI_MODEL_PRESETS,
+  type AiKeySource,
   type AiProviderName,
 } from "@/lib/ai-settings";
 import type { StandDeskRole } from "@/lib/stand-desk";
@@ -24,13 +25,69 @@ type SettingsPayload = {
     provider: AiProviderName;
     azureDeployment: string;
     geminiModel: string;
+    azureApiKey: string;
+    azureResourceName: string;
+    geminiApiKey: string;
     source: "firestore" | "env";
     updatedAt: string | null;
+    keySource?: {
+      azureApiKey: AiKeySource;
+      azureResourceName: AiKeySource;
+      geminiApiKey: AiKeySource;
+    };
   };
 };
 
 function selectValue(current: string, presets: readonly { id: string }[]): string {
   return presets.some((p) => p.id === current) ? current : CUSTOM;
+}
+
+function sourceLabelFor(source?: AiKeySource): string {
+  if (source === "firestore") return "saved in Firestore";
+  if (source === "env") return "from server env";
+  return "not set";
+}
+
+function SecretField({
+  label,
+  value,
+  onChange,
+  source,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  source?: AiKeySource;
+  placeholder?: string;
+}) {
+  const [show, setShow] = useState(true);
+  return (
+    <label className="block text-sm font-medium text-zinc-700">
+      <span className="flex items-center justify-between gap-2">
+        <span>{label}</span>
+        <span className="text-xs font-normal text-zinc-500">{sourceLabelFor(source)}</span>
+      </span>
+      <div className="mt-1 flex gap-2">
+        <input
+          type={show ? "text" : "password"}
+          autoComplete="off"
+          className={inputClass}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          spellCheck={false}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          className="shrink-0 rounded-xl border border-zinc-200 px-3 text-sm font-semibold text-zinc-700"
+        >
+          {show ? "Hide" : "Show"}
+        </button>
+      </div>
+    </label>
+  );
 }
 
 export function StandDeskSettingsView() {
@@ -41,6 +98,7 @@ export function StandDeskSettingsView() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState<"azure" | "gemini" | null>(null);
   const [payload, setPayload] = useState<SettingsPayload | null>(null);
 
   const [provider, setProvider] = useState<AiProviderName>("azure");
@@ -48,6 +106,10 @@ export function StandDeskSettingsView() {
   const [azureCustom, setAzureCustom] = useState("");
   const [geminiSelect, setGeminiSelect] = useState<string>(GEMINI_MODEL_PRESETS[0].id);
   const [geminiCustom, setGeminiCustom] = useState("");
+  const [azureApiKey, setAzureApiKey] = useState("");
+  const [azureResourceName, setAzureResourceName] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   const applyPayload = useCallback((data: SettingsPayload) => {
     setPayload(data);
@@ -58,6 +120,9 @@ export function StandDeskSettingsView() {
     setAzureCustom(selectValue(next.azureDeployment, AZURE_DEPLOYMENT_PRESETS) === CUSTOM ? next.azureDeployment : "");
     setGeminiSelect(selectValue(next.geminiModel, GEMINI_MODEL_PRESETS));
     setGeminiCustom(selectValue(next.geminiModel, GEMINI_MODEL_PRESETS) === CUSTOM ? next.geminiModel : "");
+    setAzureApiKey(next.azureApiKey ?? "");
+    setAzureResourceName(next.azureResourceName ?? "");
+    setGeminiApiKey(next.geminiApiKey ?? "");
   }, []);
 
   const loadSettings = useCallback(async () => {
@@ -121,17 +186,27 @@ export function StandDeskSettingsView() {
   const azureDeployment = azureSelect === CUSTOM ? azureCustom.trim() : azureSelect;
   const geminiModel = geminiSelect === CUSTOM ? geminiCustom.trim() : geminiSelect;
 
+  const formBody = useMemo(
+    () => ({
+      provider,
+      azureDeployment,
+      geminiModel,
+      azureApiKey,
+      azureResourceName,
+      geminiApiKey,
+    }),
+    [provider, azureDeployment, geminiModel, azureApiKey, azureResourceName, geminiApiKey],
+  );
+
   const keyWarning = useMemo(() => {
-    const keys = payload?.keys;
-    if (!keys) return null;
-    if (provider === "azure" && (!keys.azure || !keys.azureResource)) {
-      return "Azure is selected, but AZURE_OPENAI_API_KEY or AZURE_OPENAI_RESOURCE_NAME is missing from the server environment. Saving the choice still works; audits will fail until those env vars are set and the app is restarted.";
+    if (provider === "azure" && (!azureApiKey.trim() || !azureResourceName.trim())) {
+      return "Azure is selected, but the API key or resource name is empty.";
     }
-    if (provider === "gemini" && !keys.gemini) {
-      return "Gemini is selected, but GEMINI_API_KEY is missing from the server environment. Add it in .env.local / Vercel, restart, then audits can use Gemini.";
+    if (provider === "gemini" && !geminiApiKey.trim()) {
+      return "Gemini is selected, but the API key is empty.";
     }
     return null;
-  }, [payload?.keys, provider]);
+  }, [provider, azureApiKey, azureResourceName, geminiApiKey]);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -147,16 +222,38 @@ export function StandDeskSettingsView() {
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, azureDeployment, geminiModel }),
+        body: JSON.stringify(formBody),
       });
       const data = (await res.json()) as SettingsPayload;
       if (!res.ok || !data.success) throw new Error(data.error ?? "Could not save settings");
       applyPayload(data);
-      setNotice("Saved. New audits will use this provider and model within a few seconds.");
+      setNotice("Saved to Firestore. New audits use these keys within a few seconds — no redeploy.");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onTest(which: "azure" | "gemini") {
+    setTesting(which);
+    setError(null);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/admin/settings/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formBody, provider: which }),
+      });
+      const data = (await res.json()) as { success?: boolean; model?: string; sample?: string; error?: string };
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? `Could not reach ${which}.`);
+      }
+      setTestResult(`${which} ok · ${data.model}${data.sample ? ` · “${data.sample}”` : ""}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTesting(null);
     }
   }
 
@@ -213,6 +310,7 @@ export function StandDeskSettingsView() {
   }
 
   const sourceLabel = payload?.settings?.source === "firestore" ? "Firestore" : "environment defaults";
+  const keySource = payload?.settings?.keySource;
 
   return (
     <div className="space-y-5">
@@ -224,9 +322,8 @@ export function StandDeskSettingsView() {
             </p>
             <h1 className="mt-2 font-serif text-3xl font-semibold text-[#212121]">Settings</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-              Switch Azure OpenAI or Gemini, and the model name, without a redeploy. Keys stay in
-              Vercel / <code className="rounded bg-zinc-100 px-1">.env.local</code> — never in this
-              form.
+              Provider, model, and API keys are stored in Firestore. Save, then Test — no Vercel
+              redeploy. Super admin only.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -246,6 +343,7 @@ export function StandDeskSettingsView() {
         </div>
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
         {notice ? <p className="mt-3 text-sm text-emerald-800">{notice}</p> : null}
+        {testResult ? <p className="mt-3 text-sm text-emerald-800">{testResult}</p> : null}
       </section>
 
       <form
@@ -286,10 +384,7 @@ export function StandDeskSettingsView() {
             />
             <span>
               <span className="block text-sm font-semibold text-zinc-900">Google Gemini</span>
-              <span className="mt-1 block text-sm text-zinc-600">
-                Google AI Studio. Needs <code className="rounded bg-zinc-100 px-1">GEMINI_API_KEY</code>{" "}
-                on the server.
-              </span>
+              <span className="mt-1 block text-sm text-zinc-600">Uses the Gemini API key below.</span>
             </span>
           </label>
         </fieldset>
@@ -348,15 +443,70 @@ export function StandDeskSettingsView() {
           </label>
         ) : null}
 
+        <div className="space-y-4 rounded-2xl border border-zinc-200 p-4">
+          <p className="text-sm font-semibold text-zinc-900">API keys</p>
+          <p className="text-sm leading-6 text-zinc-600">
+            Values shown here are what the audit will use. Empty + Save clears the Firestore copy
+            and falls back to Vercel / <code className="rounded bg-zinc-100 px-1">.env.local</code>.
+          </p>
+          <SecretField
+            label="Azure OpenAI API key"
+            value={azureApiKey}
+            onChange={setAzureApiKey}
+            source={keySource?.azureApiKey}
+          />
+          <label className="block text-sm font-medium text-zinc-700">
+            <span className="flex items-center justify-between gap-2">
+              <span>Azure resource name</span>
+              <span className="text-xs font-normal text-zinc-500">
+                {sourceLabelFor(keySource?.azureResourceName)}
+              </span>
+            </span>
+            <input
+              className={`${inputClass} mt-1`}
+              value={azureResourceName}
+              onChange={(e) => setAzureResourceName(e.target.value)}
+              placeholder="sitecoreopenai-sandbox-et"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+          <SecretField
+            label="Gemini API key"
+            value={geminiApiKey}
+            onChange={setGeminiApiKey}
+            source={keySource?.geminiApiKey}
+            placeholder="AQ.… or AIza…"
+          />
+        </div>
+
         {keyWarning ? <p className="text-sm text-amber-800">{keyWarning}</p> : null}
 
-        <button
-          type="submit"
-          disabled={saving || payload?.firestore === false}
-          className="rounded-[0.625rem] bg-[#6e3fff] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save settings"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={saving || payload?.firestore === false}
+            className="rounded-[0.625rem] bg-[#6e3fff] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save settings"}
+          </button>
+          <button
+            type="button"
+            disabled={testing !== null}
+            onClick={() => void onTest("azure")}
+            className="rounded-[0.625rem] border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 disabled:opacity-50"
+          >
+            {testing === "azure" ? "Testing Azure…" : "Test Azure"}
+          </button>
+          <button
+            type="button"
+            disabled={testing !== null}
+            onClick={() => void onTest("gemini")}
+            className="rounded-[0.625rem] border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 disabled:opacity-50"
+          >
+            {testing === "gemini" ? "Testing Gemini…" : "Test Gemini"}
+          </button>
+        </div>
         {payload?.firestore === false ? (
           <p className="text-sm text-red-700">
             Firestore is not configured on this server, so settings cannot be saved. Set{" "}
@@ -365,19 +515,6 @@ export function StandDeskSettingsView() {
           </p>
         ) : null}
       </form>
-
-      <section className="rounded-[1.75rem] border border-[#ece4ff] bg-white/90 p-6 shadow-[0_18px_45px_-28px_rgba(67,0,173,0.35)]">
-        <h2 className="font-serif text-xl font-semibold text-[#212121]">Keys on this server</h2>
-        <ul className="mt-3 space-y-1 text-sm text-zinc-700">
-          <li>Azure OpenAI API key: {payload?.keys?.azure ? "present" : "missing"}</li>
-          <li>Azure resource name: {payload?.keys?.azureResource ? "present" : "missing"}</li>
-          <li>Gemini API key: {payload?.keys?.gemini ? "present" : "missing"}</li>
-        </ul>
-        <p className="mt-4 text-sm leading-6 text-zinc-600">
-          Changing a key still requires a restart (local) or a Vercel redeploy. Changing provider /
-          model here does not.
-        </p>
-      </section>
 
       <section className="rounded-[1.75rem] border border-[#ece4ff] bg-white/90 p-6 shadow-[0_18px_45px_-28px_rgba(67,0,173,0.35)]">
         <h2 className="font-serif text-xl font-semibold text-[#212121]">Create a Gemini API key</h2>
@@ -394,18 +531,11 @@ export function StandDeskSettingsView() {
             </a>
             .
           </li>
-          <li>Sign in with the Google account that should own the key. Create or pick a Google Cloud project.</li>
-          <li>Click Create API key. Copy it once — Google will not show the full value again.</li>
-          <li>
-            Put it in <code className="rounded bg-zinc-100 px-1">GEMINI_API_KEY</code> in{" "}
-            <code className="rounded bg-zinc-100 px-1">.env.local</code> for local, and in Vercel →
-            Project → Settings → Environment Variables for production. Restart / redeploy.
-          </li>
-          <li>Come back here, choose Google Gemini, pick a model, and Save.</li>
+          <li>Create a key, paste it in Gemini API key above, Save, then Test Gemini.</li>
         </ol>
         <p className="mt-3 text-sm leading-6 text-zinc-600">
-          Do not paste the key into this page, Firestore, git, or Slack. If the key leaks, delete it
-          in AI Studio and create a new one.
+          Do not commit keys, put them in README, or paste them in Slack. If a key leaks, delete it
+          in AI Studio and paste a new one here.
         </p>
       </section>
 
@@ -421,22 +551,18 @@ export function StandDeskSettingsView() {
           ) : (
             " (set NEXT_PUBLIC_FIREBASE_PROJECT_ID)"
           )}
-          . There is no SQL database. Writes go through Firebase Admin on the server — the browser
-          never talks to Firestore directly.
+          . Writes go through Firebase Admin — the browser never talks to Firestore directly.
         </p>
         <ul className="mt-3 space-y-1 text-sm text-zinc-700">
           <li>
             <code className="rounded bg-zinc-100 px-1">tmf_scrunch_settings</code> /{" "}
-            <code className="rounded bg-zinc-100 px-1">app</code> — provider and model (this page)
+            <code className="rounded bg-zinc-100 px-1">app</code> — provider, model, and API keys
           </li>
           <li>
             <code className="rounded bg-zinc-100 px-1">tmf_scrunch_leads</code> — booth companies
           </li>
           <li>
             <code className="rounded bg-zinc-100 px-1">tmf_scrunch_reports</code> — visibility briefs + PDFs
-          </li>
-          <li>
-            <code className="rounded bg-zinc-100 px-1">tmf_scrunch_pdfs</code> — official Scrunch PDFs
           </li>
           <li>
             <code className="rounded bg-zinc-100 px-1">tmf_scrunch_audit_events</code> — every generate attempt

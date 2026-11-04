@@ -2,10 +2,21 @@ export const AI_PROVIDERS = ["azure", "gemini"] as const;
 
 export type AiProviderName = (typeof AI_PROVIDERS)[number];
 
+export type AiKeySource = "firestore" | "env" | "missing";
+
 export type AiRuntimeSettings = {
   provider: AiProviderName;
   azureDeployment: string;
   geminiModel: string;
+  azureApiKey: string;
+  azureResourceName: string;
+  geminiApiKey: string;
+};
+
+export type AiKeySources = {
+  azureApiKey: AiKeySource;
+  azureResourceName: AiKeySource;
+  geminiApiKey: AiKeySource;
 };
 
 export const DEFAULT_AZURE_DEPLOYMENT = "gpt-4o";
@@ -48,6 +59,17 @@ export function requireModelId(value: unknown, field: string): string {
   if (raw.length > 80 || !/^[a-zA-Z0-9._:-]+$/.test(raw)) {
     throw new Error(`${field} can only contain letters, numbers, dots, underscores, colons, and hyphens.`);
   }
+  return raw;
+}
+
+export function sanitizeSecret(value: unknown, max = 256): string {
+  return String(value ?? "").replace(/[\r\n\u0000]/g, "").trim().slice(0, max);
+}
+
+export function sanitizeAzureResource(value: unknown, fallback = ""): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  if (raw.length > 80 || !/^[a-zA-Z0-9-]+$/.test(raw)) return fallback;
   return raw;
 }
 
