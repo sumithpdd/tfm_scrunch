@@ -15,14 +15,18 @@ import { getRuntimeAiSettings } from "@/server/ai/runtime-settings";
 export type { AiProviderName } from "@/lib/ai-settings";
 
 let azureSingleton: ReturnType<typeof createAzure> | null = null;
+let azureSingletonKey = "";
 let geminiSingleton: ReturnType<typeof createGoogleGenerativeAI> | null = null;
+let geminiSingletonKey = "";
 
 function getAzureProvider() {
-  if (!azureSingleton) {
-    const apiKey = process.env.AZURE_OPENAI_API_KEY;
-    const resourceName = process.env.AZURE_OPENAI_RESOURCE_NAME;
-    if (!apiKey) throw new Error("AZURE_OPENAI_API_KEY is not configured");
-    if (!resourceName) throw new Error("AZURE_OPENAI_RESOURCE_NAME is not configured");
+  const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
+  const resourceName = process.env.AZURE_OPENAI_RESOURCE_NAME?.trim();
+  if (!apiKey) throw new Error("AZURE_OPENAI_API_KEY is not configured");
+  if (!resourceName) throw new Error("AZURE_OPENAI_RESOURCE_NAME is not configured");
+  const fingerprint = `${apiKey}:${resourceName}`;
+  if (!azureSingleton || azureSingletonKey !== fingerprint) {
+    azureSingletonKey = fingerprint;
     azureSingleton = createAzure({
       apiKey,
       resourceName,
@@ -33,9 +37,10 @@ function getAzureProvider() {
 }
 
 function getGeminiProvider() {
-  if (!geminiSingleton) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
+  if (!geminiSingleton || geminiSingletonKey !== apiKey) {
+    geminiSingletonKey = apiKey;
     geminiSingleton = createGoogleGenerativeAI({ apiKey });
   }
   return geminiSingleton;
