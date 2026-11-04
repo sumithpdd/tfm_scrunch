@@ -58,3 +58,43 @@ export async function logAuditEvent(input: AuditEventInput): Promise<void> {
     console.warn("[audit-event] write failed", err);
   }
 }
+
+export type AuditEventRecord = {
+  id: string;
+  outcome: AuditEventOutcome;
+  name: string;
+  email: string;
+  company: string;
+  website: string;
+  extraUrls: string[];
+  error: string;
+  durationMs: number | null;
+  createdAt: string | null;
+};
+
+/** Most recent audit events (successes, failures, and blocked attempts), newest first. */
+export async function listRecentAuditEvents(limit = 100): Promise<AuditEventRecord[]> {
+  if (!isServerFirestoreAvailable()) return [];
+  const snap = await getAdminDb()
+    .collection(AUDIT_EVENTS_COLLECTION)
+    .orderBy("createdAt", "desc")
+    .limit(Math.min(Math.max(limit, 1), 500))
+    .get();
+
+  return snap.docs.map((doc) => {
+    const d = doc.data() as Record<string, unknown>;
+    const createdAt = d.createdAt as { toDate?: () => Date } | undefined;
+    return {
+      id: doc.id,
+      outcome: (d.outcome as AuditEventOutcome) ?? "failed",
+      name: typeof d.name === "string" ? d.name : "",
+      email: typeof d.email === "string" ? d.email : "",
+      company: typeof d.company === "string" ? d.company : "",
+      website: typeof d.website === "string" ? d.website : "",
+      extraUrls: Array.isArray(d.extraUrls) ? (d.extraUrls as string[]) : [],
+      error: typeof d.error === "string" ? d.error : "",
+      durationMs: typeof d.durationMs === "number" ? d.durationMs : null,
+      createdAt: createdAt?.toDate ? createdAt.toDate().toISOString() : null,
+    };
+  });
+}

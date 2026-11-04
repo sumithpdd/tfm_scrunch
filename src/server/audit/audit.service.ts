@@ -1,6 +1,6 @@
 import "server-only";
 import { generateObject, generateText } from "ai";
-import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError } from "@/lib/gemini-config";
+import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError, describeGenerationError } from "@/lib/gemini-config";
 import { addGeminiUsage, usageFromAiResult, type GeminiTokenUsage } from "@/lib/gemini-usage";
 import type { AeoAuditReport } from "@/lib/audit-types";
 import { emptyAuditReport } from "@/lib/audit-types";
@@ -103,6 +103,7 @@ ${extraBlock}
     });
     let generated: AeoAuditGenerated;
     let usage: GeminiTokenUsage | null = null;
+    let objectError: unknown = null;
     try {
       const result = await generateObject({
         model,
@@ -112,14 +113,24 @@ ${extraBlock}
       });
       generated = result.object;
       usage = usageFromAiResult(result, modelId);
-    } catch {
-      const textResult = await generateText({
-        model,
-        system: `${AUDIT_SYSTEM_PROMPT}\nReturn a single JSON object matching the audit report fields. No markdown.`,
-        prompt: userPrompt,
-      });
-      generated = auditReportSchema.parse(parseJsonLoose(textResult.text ?? ""));
-      usage = addGeminiUsage(usage, usageFromAiResult(textResult, modelId));
+    } catch (err) {
+      objectError = err;
+      try {
+        const textResult = await generateText({
+          model,
+          system: `${AUDIT_SYSTEM_PROMPT}\nReturn a single JSON object matching the audit report fields. No markdown.`,
+          prompt: userPrompt,
+        });
+        generated = auditReportSchema.parse(parseJsonLoose(textResult.text ?? ""));
+        usage = addGeminiUsage(usage, usageFromAiResult(textResult, modelId));
+      } catch (fallbackErr) {
+        const primary = describeGenerationError(objectError);
+        const secondary = describeGenerationError(fallbackErr);
+        // Both the structured call and the text-fallback parse failed -- surface the real first
+        // cause instead of letting the fallback's zod parse error (usually a confusing raw issues
+        // dump) mask it.
+        throw new Error(`Structured output failed (${primary}); text fallback also failed (${secondary})`);
+      }
     }
 
     notify?.({ id: "compare", label: "Comparing you with brands AI names nearby" });

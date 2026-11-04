@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { AeoAuditReport, AeoLead, ScrunchBrandCheck, StoredBoothLead, StoredVisibilityReport } from "@/lib/audit-types";
 import type { ScrunchConnectDiff, ScrunchSyncAction } from "@/lib/scrunch-diff-types";
 import { emptyAuditReport } from "@/lib/audit-types";
@@ -928,6 +929,12 @@ export function StandDeskView() {
             >
               {reportFullscreen ? "Exit full screen" : "Full screen"}
             </button>
+            <Link
+              href="/stand-desk/events"
+              className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700"
+            >
+              Audit log
+            </Link>
             <button
               type="button"
               onClick={() => void onRefresh()}

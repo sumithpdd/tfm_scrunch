@@ -15,6 +15,7 @@
  */
 import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { ZodError } from "zod";
 
 export type AiProviderName = "azure" | "gemini";
 
@@ -75,8 +76,24 @@ export function getGeminiModelId(): string {
     : `azure:${getAzureDeploymentName()}`;
 }
 
+/**
+ * A failed schema .parse() throws a ZodError whose default .message is the raw issues array
+ * as JSON (e.g. `[{"expected":"string","code":"invalid_type","path":["brandName"],...}]`).
+ * That's what generateObject/generateText + .parse() were surfacing straight to the booth UI.
+ * Describe it in a sentence instead, and pass anything else through untouched.
+ */
+export function describeGenerationError(err: unknown): string {
+  if (err instanceof ZodError) {
+    const fields = [...new Set(err.issues.map((i) => i.path.join(".")).filter(Boolean))];
+    return fields.length
+      ? `response didn't match the expected format (missing or invalid: ${fields.join(", ")})`
+      : "response didn't match the expected format";
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 export function formatGeminiError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err);
+  const raw = describeGenerationError(err);
   const provider = getActiveProviderName();
 
   if (provider === "azure") {

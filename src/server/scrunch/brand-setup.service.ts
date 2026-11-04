@@ -1,6 +1,6 @@
 import "server-only";
 import { generateObject, generateText } from "ai";
-import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError } from "@/lib/gemini-config";
+import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError, describeGenerationError } from "@/lib/gemini-config";
 import { addGeminiUsage, usageFromAiResult, type GeminiTokenUsage } from "@/lib/gemini-usage";
 import {
   SCRUNCH_PLATFORM_TOKENS,
@@ -186,6 +186,7 @@ Do not invent owned domains or stakeholder emails.`;
     const modelId = getGeminiModelId();
     let generated: ScrunchSheetGenerated;
     let usage: GeminiTokenUsage | null = null;
+    let objectError: unknown = null;
     try {
       const result = await generateObject({
         model,
@@ -195,14 +196,24 @@ Do not invent owned domains or stakeholder emails.`;
       });
       generated = result.object;
       usage = usageFromAiResult(result, modelId);
-    } catch {
-      const textResult = await generateText({
-        model,
-        system: `${SCRUNCH_SETUP_SYSTEM}\nReturn a single JSON object matching the build sheet fields. No markdown.`,
-        prompt: userPrompt,
-      });
-      generated = scrunchSheetSchema.parse(parseJsonLoose(textResult.text ?? ""));
-      usage = addGeminiUsage(usage, usageFromAiResult(textResult, modelId));
+    } catch (err) {
+      objectError = err;
+      try {
+        const textResult = await generateText({
+          model,
+          system: `${SCRUNCH_SETUP_SYSTEM}\nReturn a single JSON object matching the build sheet fields. No markdown.`,
+          prompt: userPrompt,
+        });
+        generated = scrunchSheetSchema.parse(parseJsonLoose(textResult.text ?? ""));
+        usage = addGeminiUsage(usage, usageFromAiResult(textResult, modelId));
+      } catch (fallbackErr) {
+        const primary = describeGenerationError(objectError);
+        const secondary = describeGenerationError(fallbackErr);
+        // Both the structured call and the text-fallback parse failed -- surface the real first
+        // cause instead of letting the fallback's zod parse error (usually a confusing raw issues
+        // dump) mask it.
+        throw new Error(`Structured output failed (${primary}); text fallback also failed (${secondary})`);
+      }
     }
 
     return {
