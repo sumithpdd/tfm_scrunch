@@ -2,7 +2,7 @@
   "name": "tfm-scrunch",
   "version": "0.1.0",
   "private": true,
-  "description": "Sitecore + Scrunch free AEO/GEO discoverability audit — Technology for Marketing 2026 booth activity.",
+  "description": "Sitecore + Scrunch free AEO/GEO discoverability audit \u2014 Technology for Marketing 2026 booth activity.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,7 +12,7 @@
   "dependencies": {
     "@ai-sdk/azure": "^4.0.116",
     "@ai-sdk/google": "^4.0.1",
-    "ai": "^7.0.3",
+    "ai": "^7.0.162",
     "botid": "^1.5.11",
     "firebase-admin": "^14.3.0",
     "jspdf": "^4.2.1",
@@ -32,5 +32,8 @@
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@ai-sdk/provider": "4.0.35"
   }
 }
