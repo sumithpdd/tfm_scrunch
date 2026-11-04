@@ -23,6 +23,18 @@ function parseJsonLoose(text: string): unknown {
   return JSON.parse(raw.slice(start, end + 1));
 }
 
+function withInputIdentity(value: unknown, input: GenerateAuditInput): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const data = value as Record<string, unknown>;
+  const brandName = typeof data.brandName === "string" ? data.brandName.trim() : "";
+  const website = typeof data.website === "string" ? data.website.trim() : "";
+  return {
+    ...data,
+    brandName: brandName || input.brandName,
+    website: website || input.website,
+  };
+}
+
 function normalizeReport(
   generated: AeoAuditGenerated,
   input: GenerateAuditInput,
@@ -132,7 +144,9 @@ ${extraBlock}
           system: `${AUDIT_SYSTEM_PROMPT}\nReturn a single JSON object matching the audit report fields. No markdown.`,
           prompt: userPrompt,
         });
-        generated = auditReportSchema.parse(parseJsonLoose(textResult.text ?? ""));
+        generated = auditReportSchema.parse(
+          withInputIdentity(parseJsonLoose(textResult.text ?? ""), input),
+        );
         usage = addGeminiUsage(usage, usageFromAiResult(textResult, modelId));
       } catch (fallbackErr) {
         const primary = describeGenerationError(objectError);

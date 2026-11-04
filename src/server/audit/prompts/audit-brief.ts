@@ -2,8 +2,8 @@ import { z } from "zod";
 import { AEO_PLATFORM_TOKENS } from "@/lib/audit-types";
 
 export const auditReportSchema = z.object({
-  brandName: z.string().optional(),
-  website: z.string().optional(),
+  brandName: z.string().describe("Copy exactly from the user prompt Brand name line"),
+  website: z.string().describe("Copy exactly from the user prompt Primary website line"),
   primaryCountry: z.string().describe("ISO-2, e.g. GB. Never US unless the brand is US-primary."),
   primaryCountryLabel: z.string().describe("Human label, e.g. United Kingdom"),
   description: z.string().describe("2-4 sentences describing what the brand does, for a non-expert reader."),
@@ -136,7 +136,7 @@ export const auditReportSchema = z.object({
       )
       .min(2)
       .max(4),
-  }).optional(),
+  }),
 });
 
 export type AeoAuditGenerated = z.infer<typeof auditReportSchema>;
@@ -157,6 +157,7 @@ Audience: a marketer who just typed their brand name and website into a booth ki
 9. Platforms considered (always the same set): ${AEO_PLATFORM_TOKENS}
 
 ## Hard rules
+- Always set brandName and website to the exact Brand name and Primary website from the user message. Never omit them or any other schema field, including visibility.
 - Do not claim to have run a live check against ChatGPT, Perplexity, or any other assistant. This is a research-based hypothesis, not a measured result.
 - Do not invent stakeholder emails, owned domains, or live citation counts. estimatedPct values are labelled hypotheses, not measured Scrunch results.
 - Keep language plain and marketer-friendly - no internal Scrunch product jargon (no "wizard", "brand id", "org id", "CSV import").
