@@ -1,6 +1,8 @@
 import "server-only";
 import { generateObject, generateText } from "ai";
-import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError, describeGenerationError } from "@/lib/gemini-config";
+import { getModelFor, formatGeminiError, describeGenerationError } from "@/lib/gemini-config";
+import { modelIdFor, type AiProviderName } from "@/lib/ai-settings";
+import { getRuntimeAiSettings } from "@/server/ai/runtime-settings";
 import { addGeminiUsage, usageFromAiResult, type GeminiTokenUsage } from "@/lib/gemini-usage";
 import type { AeoAuditReport } from "@/lib/audit-types";
 import { emptyAuditReport } from "@/lib/audit-types";
@@ -21,34 +23,41 @@ function parseJsonLoose(text: string): unknown {
   return JSON.parse(raw.slice(start, end + 1));
 }
 
-function normalizeReport(generated: AeoAuditGenerated): AeoAuditReport {
-  const prompts = generated.prompts.map((p) => ({ ...p }));
+function normalizeReport(
+  generated: AeoAuditGenerated,
+  input: GenerateAuditInput,
+  provider: AiProviderName,
+): AeoAuditReport {
+  const prompts = (generated.prompts ?? []).map((p) => ({ ...p }));
+  const competitors = generated.competitors ?? [];
+  const personas = generated.personas ?? [];
+  const topics = generated.topics ?? [];
   const nonBranded = prompts.filter((p) => !p.branded).length;
   return {
-    brandName: generated.brandName,
-    website: generated.website,
+    brandName: generated.brandName?.trim() || input.brandName,
+    website: generated.website?.trim() || input.website,
     primaryCountry: generated.primaryCountry,
     primaryCountryLabel: generated.primaryCountryLabel,
     description: generated.description,
     readiness: generated.readiness,
     readinessSummary: generated.readinessSummary,
-    competitors: generated.competitors,
-    personas: generated.personas,
-    topics: generated.topics,
+    competitors,
+    personas,
+    topics,
     prompts,
-    hypotheses: generated.hypotheses,
+    hypotheses: generated.hypotheses ?? [],
     citationPrompts: generated.citationPrompts ?? [],
     mentionRates: [...(generated.mentionRates ?? [])].sort((a, b) => b.estimatedPct - a.estimatedPct),
     visibility: generated.visibility ?? null,
     counts: {
-      topics: generated.topics.length,
-      competitors: generated.competitors.length,
-      personas: generated.personas.length,
+      topics: topics.length,
+      competitors: competitors.length,
+      personas: personas.length,
       prompts: prompts.length,
       nonBrandedPct: prompts.length ? Math.round((nonBranded / prompts.length) * 100) : 0,
       platforms: 9,
     },
-    source: getActiveProviderName() === "gemini" ? "gemini" : "azure-openai",
+    source: provider === "gemini" ? "gemini" : "azure-openai",
   };
 }
 
@@ -92,10 +101,12 @@ ${page.text || "(empty - use public knowledge; note this clearly in readinessSum
 ${extraBlock}
 `;
 
+  let provider: AiProviderName = "azure";
   try {
-    const model = getModel();
-
-    const modelId = getGeminiModelId();
+    const settings = await getRuntimeAiSettings();
+    provider = settings.provider;
+    const model = getModelFor(settings);
+    const modelId = modelIdFor(settings);
     notify?.({
       id: "research",
       label: "Researching how AI would describe you",
@@ -135,11 +146,11 @@ ${extraBlock}
 
     notify?.({ id: "compare", label: "Comparing you with brands AI names nearby" });
     notify?.({ id: "write", label: "Writing your visibility brief" });
-    return { report: { ...normalizeReport(generated), ...(usage ? { usage } : {}) } };
+    return { report: { ...normalizeReport(generated, input, provider), ...(usage ? { usage } : {}) } };
   } catch (err: unknown) {
     return {
       report: emptyAuditReport(input.brandName, input.website),
-      error: formatGeminiError(err),
+      error: formatGeminiError(err, provider),
     };
   }
 }

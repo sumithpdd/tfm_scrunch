@@ -42,7 +42,8 @@ Open http://localhost:3000.
 ## Stand desk
 
 Staff-only leads list (not in the public nav): **`/stand-desk`**. Unlock with `LEADS_ADMIN_SECRET`,
-then search, filter, and download CSV.
+then search, filter, and download CSV. Super admin can open **`/stand-desk/settings`** to switch
+Azure vs Gemini and the model name (API keys stay in env).
 
 ## Branding
 
@@ -51,11 +52,11 @@ lives in one place: `src/lib/site-config.ts`.
 
 ## Deploy
 
-Vercel (or similar): set `AI_PROVIDER` (`azure` default; `gemini` to switch providers),
-plus whichever provider's keys it points at -- `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_RESOURCE_NAME`,
-`AZURE_OPENAI_DEPLOYMENT`, or `GEMINI_API_KEY`, `GEMINI_MODEL` -- plus `FIREBASE_SERVICE_ACCOUNT_JSON`,
-`NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `LEADS_ADMIN_SECRET` so booth leads persist and the stand
-desk can open. See `.env.example`.
+Vercel (or similar): set the provider keys (`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_RESOURCE_NAME`,
+and/or `GEMINI_API_KEY`) plus `FIREBASE_SERVICE_ACCOUNT_JSON`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`,
+and `LEADS_ADMIN_SECRET` so booth leads persist and the stand desk can open. Switch Azure vs
+Gemini and the model from the super-admin **Settings** page (`/stand-desk/settings`). See
+`.env.example`.
 
 ## Docs
 

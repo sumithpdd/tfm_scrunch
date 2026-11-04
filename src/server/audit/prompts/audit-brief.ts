@@ -2,8 +2,8 @@ import { z } from "zod";
 import { AEO_PLATFORM_TOKENS } from "@/lib/audit-types";
 
 export const auditReportSchema = z.object({
-  brandName: z.string(),
-  website: z.string(),
+  brandName: z.string().optional(),
+  website: z.string().optional(),
   primaryCountry: z.string().describe("ISO-2, e.g. GB. Never US unless the brand is US-primary."),
   primaryCountryLabel: z.string().describe("Human label, e.g. United Kingdom"),
   description: z.string().describe("2-4 sentences describing what the brand does, for a non-expert reader."),

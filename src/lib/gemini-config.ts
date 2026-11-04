@@ -1,38 +1,18 @@
+import "server-only";
 /**
- * Model/provider config for the booth audit + Scrunch brand-setup generation.
+ * Model/provider factory for the booth audit + Scrunch brand-setup generation.
  *
- * Supports two providers side by side:
- *   - "azure"  -> org IT AI sandbox (SitecoreOpenAI-Sandbox-ET) -- the default, since it's
- *                 funded right now
- *   - "gemini" -> Google AI Studio -- the original engine, kept wired up so we can flip back
- *                 the moment Gemini credits are topped up
- *
- * Toggle with AI_PROVIDER=azure|gemini in .env.local. Unset or anything else = "azure".
- *
- * Function names kept as `*Gemini*` on purpose -- they're imported from several files (see
- * AGENTS.md) and a rename wasn't worth the blast radius for what's really a provider toggle.
- * They now resolve whichever provider is active.
+ * Live switch lives in Firestore `tmf_scrunch_settings/app` (stand-desk Settings, super admin).
+ * Env vars `AI_PROVIDER`, `AZURE_OPENAI_DEPLOYMENT`, `GEMINI_MODEL` are the fallback until
+ * that document exists. API keys stay in env and are never written to Firestore.
  */
 import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { ZodError } from "zod";
+import { modelIdFor, type AiProviderName, type AiRuntimeSettings } from "@/lib/ai-settings";
+import { getRuntimeAiSettings } from "@/server/ai/runtime-settings";
 
-export type AiProviderName = "azure" | "gemini";
-
-export function getActiveProviderName(): AiProviderName {
-  const raw = process.env.AI_PROVIDER?.trim().toLowerCase();
-  return raw === "gemini" ? "gemini" : "azure";
-}
-
-function getAzureDeploymentName(): string {
-  // The "model id" passed to the SDK provider for Azure OpenAI is the *deployment name*
-  // chosen in Azure AI Foundry (e.g. "gpt-4o"), not a base model family name.
-  return process.env.AZURE_OPENAI_DEPLOYMENT?.trim() || "gpt-4o";
-}
-
-function getGeminiModelName(): string {
-  return process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
-}
+export type { AiProviderName } from "@/lib/ai-settings";
 
 let azureSingleton: ReturnType<typeof createAzure> | null = null;
 let geminiSingleton: ReturnType<typeof createGoogleGenerativeAI> | null = null;
@@ -61,19 +41,23 @@ function getGeminiProvider() {
   return geminiSingleton;
 }
 
-/** The AI SDK language model for whichever provider AI_PROVIDER currently selects. */
-export function getModel() {
-  if (getActiveProviderName() === "gemini") {
-    return getGeminiProvider()(getGeminiModelName());
+export function getModelFor(settings: AiRuntimeSettings) {
+  if (settings.provider === "gemini") {
+    return getGeminiProvider()(settings.geminiModel);
   }
-  return getAzureProvider()(getAzureDeploymentName());
+  return getAzureProvider()(settings.azureDeployment);
 }
 
-/** Display/label id for usage tracking + UI, e.g. "azure:gpt-4o" or "gemini:gemini-3.8-flash". */
-export function getGeminiModelId(): string {
-  return getActiveProviderName() === "gemini"
-    ? `gemini:${getGeminiModelName()}`
-    : `azure:${getAzureDeploymentName()}`;
+export async function getModel() {
+  return getModelFor(await getRuntimeAiSettings());
+}
+
+export async function getActiveProviderName(): Promise<AiProviderName> {
+  return (await getRuntimeAiSettings()).provider;
+}
+
+export async function getGeminiModelId(): Promise<string> {
+  return modelIdFor(await getRuntimeAiSettings());
 }
 
 /**
@@ -92,44 +76,42 @@ export function describeGenerationError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-export function formatGeminiError(err: unknown): string {
+export function formatGeminiError(err: unknown, provider?: AiProviderName): string {
   const raw = describeGenerationError(err);
-  const provider = getActiveProviderName();
+  const active = provider ?? "azure";
 
-  if (provider === "azure") {
+  if (active === "azure") {
     if (raw.includes("AZURE_OPENAI_API_KEY") || raw.includes("AZURE_OPENAI_RESOURCE_NAME")) {
       return (
-        "Azure OpenAI isn't configured. Add AZURE_OPENAI_API_KEY, AZURE_OPENAI_RESOURCE_NAME, " +
-        "and AZURE_OPENAI_DEPLOYMENT to .env.local (see .env.example) and restart the dev server."
+        "Azure OpenAI isn't configured. Add AZURE_OPENAI_API_KEY and AZURE_OPENAI_RESOURCE_NAME " +
+        "to .env.local / Vercel, then pick the deployment name in Stand desk → Settings."
       );
     }
     if (raw.includes("429") || /rate limit/i.test(raw)) {
       return (
         "Azure OpenAI rate limit hit (the deployment's tokens-per-minute cap). " +
-        "Wait a minute and retry, or raise the deployment's quota in Azure AI Foundry -> " +
-        "Deployments -> (your deployment) -> Edit, or switch AI_PROVIDER=gemini in .env.local."
+        "Wait a minute and retry, or switch to Gemini in Stand desk → Settings."
       );
     }
     if (raw.includes("401") || raw.includes("DeploymentNotFound") || /unauthorized/i.test(raw)) {
       return (
         "Azure OpenAI rejected the request. Check AZURE_OPENAI_API_KEY is current, and that " +
-        "AZURE_OPENAI_DEPLOYMENT exactly matches a deployment name that exists in the resource."
+        "the deployment name in Settings exactly matches a deployment in Azure AI Foundry."
       );
     }
     return raw;
   }
 
-  // Gemini
   if (raw.includes("GEMINI_API_KEY")) {
     return (
-      "Gemini isn't configured. Add GEMINI_API_KEY to .env.local (see .env.example), or " +
-      "switch AI_PROVIDER=azure to use the Azure sandbox instead."
+      "Gemini isn't configured. Add GEMINI_API_KEY to .env.local / Vercel (see Stand desk → Settings), " +
+      "or switch the provider back to Azure OpenAI."
     );
   }
   if (raw.includes("429") || /rate limit|quota/i.test(raw)) {
     return (
-      "Gemini rate limit or quota hit. Wait a bit and retry, or set AI_PROVIDER=azure in " +
-      ".env.local to switch to the Azure sandbox."
+      "Gemini rate limit or quota hit. Wait a bit and retry, or switch to Azure OpenAI in " +
+      "Stand desk → Settings."
     );
   }
   if (raw.includes("401") || raw.includes("403") || /unauthorized|permission/i.test(raw)) {

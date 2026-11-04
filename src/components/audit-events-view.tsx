@@ -187,6 +187,14 @@ export function AuditEventsView() {
             >
               Leads
             </Link>
+            {role === "super" ? (
+              <Link
+                href="/stand-desk/settings"
+                className="rounded-[0.625rem] border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700"
+              >
+                Settings
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={() => setOnlyProblems((v) => !v)}

@@ -12,19 +12,20 @@ alwaysApply: true
   `.env.example` (generic placeholders only).
 - Visitor names and emails live in Firestore `tmf_scrunch_leads`, visibility briefs
   in `tmf_scrunch_reports` (one doc per website), official Scrunch PDFs in Storage/Firestore
-  `tmf_scrunch_pdfs`, request logs in `tmf_scrunch_audit_events` (hashed IP), and the
-  gitignored `data/leads.jsonl` fallback. Do not commit PII, and do not add analytics
-  that ships it anywhere else without asking.
-- Do not add a client Firestore SDK or security rules that let the browser read `tmf_scrunch_leads`
-  or `tmf_scrunch_reports`. Writes go through Firebase Admin only.
+  `tmf_scrunch_pdfs`, request logs in `tmf_scrunch_audit_events` (hashed IP), runtime AI
+  provider/model in `tmf_scrunch_settings/app`, and the gitignored `data/leads.jsonl` fallback.
+  Do not commit PII, and do not add analytics that ships it anywhere else without asking.
+- Do not store API keys in Firestore or the admin UI. Provider and model *names* only.
+- Do not add a client Firestore SDK or security rules that let the browser read `tmf_scrunch_leads`,
+  `tmf_scrunch_reports`, or `tmf_scrunch_settings`. Writes go through Firebase Admin only.
 
 ## Server-only env vars
 
 | Variable | Purpose |
 |----------|---------|
-| `AI_PROVIDER` | Switches audit generation between `azure` (default) and `gemini` -- see `src/lib/gemini-config.ts` |
-| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_RESOURCE_NAME` / `AZURE_OPENAI_DEPLOYMENT` | Powers the free AEO/GEO audit generation when `AI_PROVIDER=azure` (org IT AI sandbox) |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | Powers audit generation when `AI_PROVIDER=gemini` |
+| `AI_PROVIDER` | Fallback if Firestore settings are empty. Live switch is `/stand-desk/settings` (`tmf_scrunch_settings/app`) |
+| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_RESOURCE_NAME` / `AZURE_OPENAI_DEPLOYMENT` | Azure keys stay in env. Deployment name can be overridden in admin Settings |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Gemini key stays in env. Model id can be overridden in admin Settings |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Admin SDK — writes booth leads to `tmf_scrunch_leads` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Local alternative path to the service-account JSON file |
 | `LEADS_ADMIN_SECRET` | Booth AE passcode for `/stand-desk` (view, add, run audits) |
@@ -40,15 +41,16 @@ admin app. Public generate must stay bot-resistant:
 
 - `POST /api/audit/generate` — public. Requires consent, a real email, honeypot empty,
   Vercel BotID (`checkBotId()`), and in-process rate limits (IP + email). Logs every
-  attempt to `tmf_scrunch_audit_events`. Keep those guards — this route calls a paid Azure OpenAI deployment.
+  attempt to `tmf_scrunch_audit_events`. Keep those guards — this route calls the configured paid model (Azure or Gemini).
 - `POST /api/audit/email` and `POST /api/marketing-skills/email` — disabled (503) until a
   verified sender exists.
 - `GET /api/marketing-skills` — public, read-only, serves from code (`marketing-skills-seed.ts`).
 - `/stand-desk` and `/api/admin/leads*` — **not public**. Gated by `LEADS_ADMIN_SECRET` (booth AE)
   or `LEADS_SUPER_ADMIN_SECRET` (stand admin) via an httpOnly cookie. Do not link this from the
   visitor nav. This is not Firebase Auth — it is a booth passcode so visitor PII is not on an
-  open URL. AEs cannot archive, hide, remove, or connect/sync Scrunch. Super admin can import
-  AE accounts, generate Scrunch brand settings, compare, and entity-sync.
+  open URL.   AEs cannot archive, hide, remove, connect/sync Scrunch, or change AI settings. Super admin can
+  import AE accounts, generate Scrunch brand settings, compare, entity-sync, and switch
+  Azure/Gemini on `/stand-desk/settings`.
 
 Do not add `requireApiAuth`/Firebase auth back into the kiosk routes without also adding a real
 login flow — a half-wired auth gate would just break the kiosk.

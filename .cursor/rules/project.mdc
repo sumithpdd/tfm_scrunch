@@ -15,10 +15,11 @@ server-side to Firestore.
 - **Framework**: Next.js (App Router), React 19, Tailwind 4, `next/font/google` (Google Sans)
 - **AI**: Azure OpenAI via `ai` + `@ai-sdk/azure`, called only from `src/server/audit/` and
   `src/server/scrunch/` (server-only)
-- **Persistence**: Firestore collections `tmf_scrunch_leads`, `tmf_scrunch_reports`, and
-  `tmf_scrunch_audit_events` (Firebase Admin, server-only) plus a local `data/leads.jsonl`
-  fallback — see `src/server/audit/lead-log.ts`. No client Firebase SDK. PDFs are stored on
-  the report document (`pdfBase64`).
+- **Persistence**: Firestore collections `tmf_scrunch_leads`, `tmf_scrunch_reports`,
+  `tmf_scrunch_audit_events`, and `tmf_scrunch_settings` (Firebase Admin, server-only) plus a
+  local `data/leads.jsonl` fallback — see `src/server/audit/lead-log.ts`. No client Firebase SDK.
+  PDFs are stored on the report document (`pdfBase64`). Provider/model live in
+  `tmf_scrunch_settings/app`; API keys stay in env.
 
 ## Conventions
 
@@ -38,9 +39,10 @@ server-side to Firestore.
 
 ## Deploy
 
-Vercel (or similar): set `AI_PROVIDER` (`azure` default, or `gemini`), then that provider's
-keys -- `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_RESOURCE_NAME`, `AZURE_OPENAI_DEPLOYMENT`, or
-`GEMINI_API_KEY`, `GEMINI_MODEL` -- plus `FIREBASE_SERVICE_ACCOUNT_JSON` and
-`NEXT_PUBLIC_FIREBASE_PROJECT_ID` (required to persist leads), `LEADS_ADMIN_SECRET` (stand desk),
-`AZURE_OPENAI_API_VERSION` (optional), `NEXT_PUBLIC_SITE_URL` (optional,
-defaults to sitecore.com). Bot protection is Vercel BotID (no extra keys). Email sending is disabled.
+Vercel (or similar): set provider keys (`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_RESOURCE_NAME`,
+and/or `GEMINI_API_KEY`) plus `FIREBASE_SERVICE_ACCOUNT_JSON` and
+`NEXT_PUBLIC_FIREBASE_PROJECT_ID` (required to persist leads and settings), `LEADS_ADMIN_SECRET`
+(stand desk), `AZURE_OPENAI_API_VERSION` (optional), `NEXT_PUBLIC_SITE_URL` (optional,
+defaults to sitecore.com). Switch Azure vs Gemini and the model from `/stand-desk/settings`
+(`AI_PROVIDER` / `AZURE_OPENAI_DEPLOYMENT` / `GEMINI_MODEL` are fallbacks). Bot protection is
+Vercel BotID (no extra keys). Email sending is disabled.

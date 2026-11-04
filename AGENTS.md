@@ -51,6 +51,7 @@ Sitecore/Scrunch sellers reusing the Claude skill pack.
 | Report PDF | `src/lib/report-pdf.ts`, `src/components/report-share-actions.tsx` |
 | Email report | `src/app/api/audit/email/route.ts` (disabled until a verified sender exists) |
 | Audit request log | `src/server/audit/event-log.ts` (Firestore `tmf_scrunch_audit_events`) |
+| Runtime AI settings | `src/lib/ai-settings.ts`, `src/server/ai/runtime-settings.ts`, `/stand-desk/settings` (Firestore `tmf_scrunch_settings/app`) |
 | Public bot guards | `src/server/security/botid.ts`, `src/server/security/rate-limit.ts` |
 
 ## Common tasks
@@ -65,10 +66,11 @@ Sitecore/Scrunch sellers reusing the Claude skill pack.
   local fallback.
 - **Email the visitor a PDF**: disabled in the UI and API until a verified sender exists.
   Download PDF still works.
-- **Deploy**: set `AI_PROVIDER` (`azure` default, or `gemini`), `AZURE_OPENAI_API_KEY`,
-  `AZURE_OPENAI_RESOURCE_NAME`, `AZURE_OPENAI_DEPLOYMENT`, `GEMINI_API_KEY`, `GEMINI_MODEL`,
-  `FIREBASE_SERVICE_ACCOUNT_JSON`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and `LEADS_ADMIN_SECRET`.
-  Bot checks use Vercel BotID (no extra keys). See `.env.example`.
+- **Switch Azure vs Gemini / model**: `/stand-desk/settings` (super admin). Keys stay in env.
+- **Deploy**: set provider keys (`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_RESOURCE_NAME`,
+  `GEMINI_API_KEY`), `FIREBASE_SERVICE_ACCOUNT_JSON`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and
+  `LEADS_ADMIN_SECRET`. `AI_PROVIDER` / deployment / model names are fallbacks until saved in
+  Settings. Bot checks use Vercel BotID (no extra keys). See `.env.example`.
 
 ## Do not
 

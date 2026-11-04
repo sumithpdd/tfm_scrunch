@@ -12,8 +12,11 @@ skills catalog, or deployment.
 ## Security (always)
 
 - No real keys in docs, `.env.example`, or commits
-- Server-only: `AI_PROVIDER` (`azure` default, or `gemini`) picks the engine; `AZURE_OPENAI_API_KEY`/`AZURE_OPENAI_RESOURCE_NAME`/`AZURE_OPENAI_DEPLOYMENT` for Azure, `GEMINI_API_KEY`/`GEMINI_MODEL` for Gemini, `FIREBASE_SERVICE_ACCOUNT_JSON` (or `GOOGLE_APPLICATION_CREDENTIALS`),
-  `LEADS_ADMIN_SECRET`
+- Server-only: API keys stay in env (`AZURE_OPENAI_API_KEY`/`AZURE_OPENAI_RESOURCE_NAME`,
+  `GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`,
+  `LEADS_ADMIN_SECRET`). Live Azure vs Gemini + model switch is Firestore
+  `tmf_scrunch_settings/app` via `/stand-desk/settings`. `AI_PROVIDER` / deployment / model env
+  vars are fallbacks only. Never store keys in Firestore.
 - `/api/audit/generate` and `/api/marketing-skills` are intentionally public — do not add auth
   without a real login flow to back it
 - `/stand-desk` is staff-only (passcode). Do not add it to the visitor nav.
@@ -31,6 +34,7 @@ skills catalog, or deployment.
 | Marketing skill content | `src/lib/marketing-skills-seed.ts` |
 | Marketing skills UI | `src/components/marketing-skills-view.tsx`, `marketing-skill-modal.tsx` |
 | Stand desk leads list | `src/app/stand-desk/page.tsx`, `src/components/stand-desk-view.tsx` |
+| Switch Azure / Gemini | `/stand-desk/settings`, `src/server/ai/runtime-settings.ts` |
 
 ## Verify before shipping
 

@@ -8,6 +8,7 @@ import { emailLooksValid } from "@/lib/email";
 import { DataConsentCheckbox } from "@/components/data-consent-checkbox";
 import { EventSelect } from "@/components/event-select";
 import { HoneypotField } from "@/components/honeypot-field";
+import { honeypotLooksLikeAutofill } from "@/lib/honeypot";
 
 export function LeadCaptureHero() {
   const router = useRouter();
@@ -23,7 +24,18 @@ export function LeadCaptureHero() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (honeypot.trim()) return;
+    if (
+      honeypot.trim() &&
+      !honeypotLooksLikeAutofill(honeypot, {
+        website,
+        brandName: company,
+        company,
+        name,
+        email,
+      })
+    ) {
+      return;
+    }
     if (!name.trim() || !company.trim() || !email.trim() || !website.trim()) {
       setError("Fill in your name, work email, company, and website.");
       return;

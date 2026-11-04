@@ -1,6 +1,8 @@
 import "server-only";
 import { generateObject, generateText } from "ai";
-import { getModel, getActiveProviderName, getGeminiModelId, formatGeminiError, describeGenerationError } from "@/lib/gemini-config";
+import { getModelFor, formatGeminiError, describeGenerationError } from "@/lib/gemini-config";
+import { modelIdFor, type AiProviderName } from "@/lib/ai-settings";
+import { getRuntimeAiSettings } from "@/server/ai/runtime-settings";
 import { addGeminiUsage, usageFromAiResult, type GeminiTokenUsage } from "@/lib/gemini-usage";
 import {
   SCRUNCH_PLATFORM_TOKENS,
@@ -53,6 +55,7 @@ function recomputeCounts(prompts: ScrunchPromptRow[], topicCount: number, compet
 function normalizeSheet(
   generated: ScrunchSheetGenerated,
   input: GenerateScrunchInput,
+  provider: AiProviderName,
 ): Omit<ScrunchBrandSetupDoc, "updatedAt"> {
   const prompts: ScrunchPromptRow[] = generated.prompts.map((p) => ({
     ...p,
@@ -111,7 +114,7 @@ function normalizeSheet(
     scrunchBrandId: input.scrunchBrandId || "",
     createdByUid: input.createdByUid || "",
     createdByEmail: input.createdByUid || "",
-    source: getActiveProviderName() === "gemini" ? "gemini" : "azure-openai",
+    source: provider === "gemini" ? "gemini" : "azure-openai",
     skillSourceUrl: "https://github.com/rjzflynnbx/scrunch-brand-setup-v1",
   };
 }
@@ -180,10 +183,12 @@ ${page.text || "(empty — use public knowledge; note gaps in openQuestions)"}
 
 Do not invent owned domains or stakeholder emails.`;
 
+  let provider: AiProviderName = "azure";
   try {
-    const model = getModel();
-
-    const modelId = getGeminiModelId();
+    const settings = await getRuntimeAiSettings();
+    provider = settings.provider;
+    const model = getModelFor(settings);
+    const modelId = modelIdFor(settings);
     let generated: ScrunchSheetGenerated;
     let usage: GeminiTokenUsage | null = null;
     let objectError: unknown = null;
@@ -218,7 +223,7 @@ Do not invent owned domains or stakeholder emails.`;
 
     return {
       doc: {
-        ...normalizeSheet(generated, { ...input, successMeasures: measures }),
+        ...normalizeSheet(generated, { ...input, successMeasures: measures }, provider),
         ...(usage ? { geminiUsage: usage } : {}),
       },
     };
@@ -270,7 +275,7 @@ Do not invent owned domains or stakeholder emails.`;
         source: "intake",
         skillSourceUrl: "https://github.com/rjzflynnbx/scrunch-brand-setup-v1",
       },
-      error: formatGeminiError(err),
+      error: formatGeminiError(err, provider),
     };
   }
 }

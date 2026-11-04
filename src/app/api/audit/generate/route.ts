@@ -11,6 +11,7 @@ import { emailLooksValid, normalizeEmail } from "@/lib/email";
 import { SITE } from "@/lib/site-config";
 import { clientIp, hitRateLimit, userAgent } from "@/server/security/rate-limit";
 import { verifyHumanRequest } from "@/server/security/botid";
+import { honeypotLooksLikeAutofill } from "@/lib/honeypot";
 
 export const maxDuration = 60;
 
@@ -74,7 +75,8 @@ export async function POST(request: NextRequest) {
   const company = lead?.company?.trim() || brandName;
   const email = normalizeEmail(lead?.email ?? "");
 
-  if (body.websiteConfirm?.trim()) {
+  const trap = (body.hpTrap ?? body.websiteConfirm ?? "").trim();
+  if (trap && !honeypotLooksLikeAutofill(trap, { website, brandName, company, name, email })) {
     await logAuditEvent({
       outcome: "blocked_honeypot",
       ip,

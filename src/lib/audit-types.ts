@@ -208,6 +208,8 @@ export type GenerateAuditRequest = {
   extraUrls?: string[];
   consentAccepted: boolean;
   eventCode?: string;
+  hpTrap?: string;
+  /** @deprecated Chrome autofilled this when it was named websiteConfirm. */
   websiteConfirm?: string;
 };
 

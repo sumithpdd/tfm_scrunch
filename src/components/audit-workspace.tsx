@@ -104,7 +104,7 @@ export function AuditWorkspace() {
           extraUrls: parseExtraUrls(extraUrls),
           eventCode,
           consentAccepted: true,
-          websiteConfirm: honeypot,
+          hpTrap: honeypot,
         }),
       });
       const nextReport = await readAuditGenerateStream(res, (event) => {
