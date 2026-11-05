@@ -24,4 +24,6 @@ export const SITE = {
   heroHeadlineEmphasis: "your brand",
   heroSubcopy:
     "Enter your name, work email, company, and website. Scrunch — now part of Sitecore — researches how AI assistants would describe you, who they compare you to, and what buyers are asking.",
+  fallbackAuditUrl: "https://scrunch.com/brand-audit/",
+  fallbackAuditLabel: "If this breaks, use this version",
 } as const;

@@ -118,6 +118,17 @@ export function LeadCaptureHero() {
           >
             {SITE.ctaLabel}
           </button>
+          <p className="text-sm leading-6 text-zinc-500">
+            {SITE.fallbackAuditLabel}{" "}
+            <a
+              href={SITE.fallbackAuditUrl}
+              className="font-semibold text-[#6e3fff] underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {SITE.fallbackAuditUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+            </a>
+          </p>
         </form>
       </div>
 
